@@ -19,8 +19,9 @@ endif(WIN32)
 set(CMAKE_AUTOMOC ON)
 
 
-find_package(PCL 1.6 REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(PCL 1.13.1 REQUIRED)
+# find_package(OpenCV REQUIRED)
+find_package(OpenCV 4 REQUIRED
 
 include_directories(${PCL_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS} ${OpenCV_LIBRARY_DIRS})
