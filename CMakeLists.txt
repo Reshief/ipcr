@@ -24,6 +24,8 @@ set(CMAKE_AUTOMOC ON)
 find_package(PCL 1.6 REQUIRED)
 find_package(OpenCV REQUIRED)
 
+add_subdirectory(extern/cxxopts/)
+
 include_directories(${PCL_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS} ${OpenCV_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
@@ -50,4 +52,4 @@ include_directories(include/)
 
 add_executable (iterative_closest_point ${SOURCES})
 target_include_directories(iterative_closest_point PUBLIC ${OpenCV_INCLUDE_DIRS} PUBLIC ${PCL_INCLUDE_DIRS})
-target_link_libraries (iterative_closest_point ${PCL_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries (iterative_closest_point ${PCL_LIBRARIES} ${OpenCV_LIBS} cxxopts::cxxopts)
