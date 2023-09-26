@@ -28,6 +28,10 @@ cv::Mat imgMerged = cv::Mat::zeros(1024, 1024, CV_8UC3);
 pcl::PointCloud<pcl::PointXY> ptSource, ptTarget, ptTargetNew;
 pcl::registration::CorrespondenceEstimation<pcl::PointXY, pcl::PointXY> est;
 pcl::Correspondences all_correspondences;
+
+// TODO: These are Boost shared_ptr aliases, so the pointer must point to an
+// allocated piece of memory, not to a reference on the stack or the program
+// will crash at the end (as it does)
 pcl::PointCloud<pcl::PointXY>::Ptr sourcePtr(&ptSource);
 pcl::PointCloud<pcl::PointXY>::Ptr targetPtr(&ptTargetNew);
 
@@ -45,6 +49,7 @@ void readConfigFile(const std::string sConfigFileName) {
   if (f.is_open()) {
     while (!f.eof()) {
       f >> sKey >> sValue;
+      f.ignore();
       if (sKey == SxMin) {
         g_fSxMin = atof(sValue.data());
       }
@@ -63,7 +68,7 @@ void readConfigFile(const std::string sConfigFileName) {
     }
     f.close();
   } else {
-    std::cout << "Can't open file" << std::endl;
+    std::cout << "Can't open file: " << sConfigFileName << std::endl;
   }
   f.close();
 }
@@ -307,8 +312,7 @@ int main(int argc, char **argv) {
          "unused).",
          cxxopts::value<std::string>()) // Input file area after
         ("c,config_file", "Path of the configuration file to be used.",
-         cxxopts::value<std::string>()->default_value(
-             "conf/Config.ini")) // Configuration file
+         cxxopts::value<std::string>()) // Configuration file
         ("v,verbose", "Enable verbose output.",
          cxxopts::value<bool>()->default_value("false")->implicit_value(
              "true")) // Flag to enable verbose output
@@ -367,8 +371,14 @@ int main(int argc, char **argv) {
       options_error = true;
       std::cerr << "ERROR:\t Missing output path" << std::endl;
     }
-    if (result.count("config_file"))
+    if (result.count("config_file")) {
       sConfigFile = result["config_file"].as<std::string>();
+      if (sConfigFile.empty()) {
+        sConfigFile = "./conf/Config.ini";
+      }
+    } else {
+      sConfigFile = "./conf/Config.ini";
+    }
 
     if (result.count("debug"))
       debugging_enabled = result["debug"].as<bool>();

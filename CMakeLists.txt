@@ -23,6 +23,8 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(PCL 1.6 REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(Qt5 COMPONENTS Core)
+
 
 add_subdirectory(extern/cxxopts/)
 
