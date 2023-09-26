@@ -1,15 +1,19 @@
 # Stretching and Shearing cell registration
 
-Program to map before and after stretch/shear images of cell colonies via point cloud registration mapping algorithms. 
+Program to map before and after stretch/shear images of cell colonies via point cloud registration mapping algorithms.
 
+## TODO
+
+Currently point matching does not seem to work (unsure why)
 
 ## Dependencies
 
 This code depends on
 
-* OpenCV
-* PCL
-* cxxopts
+- OpenCV
+- QT, GTK for window output
+- PCL
+- cxxopts
 
 For building the program it uses CMake. To build, a compiler is required. On Windows, this makes Visual Studio (2010 or later) necessary, on Linux, clang or the gnu c++ compiler should be fine.
 
@@ -21,7 +25,6 @@ For building the program it uses CMake. To build, a compiler is required. On Win
 | `conf`    | Default configuration file                                  |
 | `include` | headers                                                     |
 | `src`     | source code for program                                     |
-
 
 ## Getting started
 
