@@ -4,8 +4,7 @@
 #include <pcl/registration/icp.h>
 #include <pcl/registration/correspondence_estimation.h>
 #include <fstream>
-#include "cv.h"
-#include "highgui.h"
+#include "opencv2/opencv.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/highgui.hpp"
 #include "cmaes.h"
@@ -398,7 +397,7 @@ int main(int argc, char **argv)
 			g_bDoCmaes = false;
 
 			// Output the new correspondences
-			ofstream oo;
+			std::ofstream oo;
 			oo.open(sOutFile);
 			est.setInputCloud(sourcePtr);
 			est.setInputTarget(targetPtr);
@@ -416,7 +415,7 @@ int main(int argc, char **argv)
 
 			// Output all info for the correspondences
 			std::string sOutAll = sOutFile + "_all.txt";
-			ofstream ooAll;
+			std::ofstream ooAll;
 			ooAll.open(sOutAll);
 			for (int i = 0; i < all_correspondences.size(); ++i)
 			{

@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 2.8)# FATAL_ERROR)
 
 project(iterative_closest_point)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin/)
+
 ###################################################################################################
 # PREPROCESSOR DEFINITIONS
 ###################################################################################################
@@ -30,11 +32,11 @@ add_definitions(${PCL_DEFINITIONS})
 # HEADER FILES
 ###################################################################################################
 set(HEADERS
-	src/cmaes.h
-	src/parameters.h
-	src/timings.h
-	src/utils.h
-	src/random.h
+	include/cmaes.h
+	include/parameters.h
+	include/timings.h
+	include/utils.h
+	include/random.h
 )
 
 ###################################################################################################
@@ -44,5 +46,8 @@ set(SOURCES
 	src/main.cpp
 )
 
-add_executable (iterative_closest_point ${HEADERS} ${SOURCES})
+include_directories(include/)
+
+add_executable (iterative_closest_point ${SOURCES})
+target_include_directories(iterative_closest_point PUBLIC ${OpenCV_INCLUDE_DIRS} PUBLIC ${PCL_INCLUDE_DIRS})
 target_link_libraries (iterative_closest_point ${PCL_LIBRARIES} ${OpenCV_LIBS})
