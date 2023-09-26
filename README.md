@@ -2,18 +2,19 @@
 
 Program to map before and after stretch/shear images of cell colonies via point cloud registration mapping algorithms.
 
-## TODO
-
 Currently point matching does not seem to work (unsure why)
+
 
 ## Dependencies
 
 This code depends on
 
-- OpenCV
+
+- OpenCV (version 4.8.0)
+- PCL (version PCL-1.13.1)
 - QT, GTK for window output
-- PCL
-- cxxopts
+- Eigen library (version 3.4.0 for PCL if building it yourself)
+- cxxopts (for command line argument parsing)
 
 For building the program it uses CMake. To build, a compiler is required. On Windows, this makes Visual Studio (2010 or later) necessary, on Linux, clang or the gnu c++ compiler should be fine.
 

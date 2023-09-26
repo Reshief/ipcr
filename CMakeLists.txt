@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 2.8)# FATAL_ERROR)
 
-project(iterative_closest_point)
+if (POLICY CMP0048)
+    cmake_policy(SET CMP0048 NEW)
+endif (POLICY CMP0048)
+
+project(iterative_closest_point VERSION 0.1.1)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin/)
 
@@ -20,12 +24,13 @@ endif(WIN32)
 
 set(CMAKE_AUTOMOC ON)
 
+# add_subdirectory(extern/eigen)
+# add_subdirectory(extern/pcl)
 
-find_package(PCL 1.6 REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(PCL 1.13.1 REQUIRED)
+# find_package(OpenCV REQUIRED)
+find_package(OpenCV 4 REQUIRED)
 find_package(Qt5 COMPONENTS Core)
-
-
 add_subdirectory(extern/cxxopts/)
 
 include_directories(${PCL_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
@@ -50,8 +55,14 @@ set(SOURCES
 	src/main.cpp
 )
 
+<<<<<<< HEAD
 include_directories(include/)
 
 add_executable (iterative_closest_point ${SOURCES})
 target_include_directories(iterative_closest_point PUBLIC ${OpenCV_INCLUDE_DIRS} PUBLIC ${PCL_INCLUDE_DIRS})
 target_link_libraries (iterative_closest_point ${PCL_LIBRARIES} ${OpenCV_LIBS} cxxopts::cxxopts)
+=======
+add_executable (iterative_closest_point ${SOURCES})
+target_include_directories(iterative_closest_point include/)
+target_link_libraries (iterative_closest_point ${PCL_LIBRARIES} ${OpenCV_LIBS})
+>>>>>>> master

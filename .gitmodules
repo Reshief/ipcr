@@ -2,3 +2,11 @@
 	path = extern/cxxopts
 	url = https://github.com/jarro2783/cxxopts.git
 	branch = eb78730
+[submodule "extern/pcl"]
+	path = extern/pcl
+	url = https://github.com/PointCloudLibrary/pcl.git
+	branch = b3a7428
+[submodule "extern/eigen"]
+	path = extern/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+	branch = 3147391d
