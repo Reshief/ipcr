@@ -2,13 +2,16 @@
 
 Program to map before and after stretch/shear images of cell colonies via point cloud registration mapping algorithms.
 
-Currently point matching does not seem to work (unsure why)
+## Quirks
 
+- After refactoring the code, I realized that the scale factor must be set in the configuration, so I fixed that to be 1.0 if not set.
+- If no configuration is provided, certain default settings are applied (no scaling, no minimum scale, no maximum scale)
+- As far as I can tell, the code does not allow for shear matching, it just performs translation and stretching.
+- still crashes on shutdown due to faulty use of shared_ptr on const reference.
 
 ## Dependencies
 
 This code depends on
-
 
 - OpenCV (version 4.8.0)
 - PCL (version PCL-1.13.1)
@@ -16,16 +19,17 @@ This code depends on
 - Eigen library (version 3.4.0 for PCL if building it yourself)
 - cxxopts (for command line argument parsing)
 
-For building the program it uses CMake. To build, a compiler is required. On Windows, this makes Visual Studio (2010 or later) necessary, on Linux, clang or the gnu c++ compiler should be fine.
+For building the program it uses CMake. To build, a rather new compiler is required. On Windows, this makes Visual Studio (2022 or later) necessary, on Linux, clang or the gnu c++ compiler should be fine.
 
 ## Directories
 
-| Name      | Purpose                                                     |
-| --------- | ----------------------------------------------------------- |
-| `build`   | Build directory if present. Not included in version control |
-| `conf`    | Default configuration file                                  |
-| `include` | headers                                                     |
-| `src`     | source code for program                                     |
+| Name           | Purpose                                                     |
+| -------------- | ----------------------------------------------------------- |
+| `build`        | Build directory if present. Not included in version control |
+| `conf`         | Default configuration file                                  |
+| `include`      | headers                                                     |
+| `sample_input` | Input files to test the point cloud matching algorithm      |
+| `src`          | source code for program                                     |
 
 ## Getting started
 
