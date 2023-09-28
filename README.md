@@ -2,6 +2,35 @@
 
 Program to map before and after stretch/shear images of cell colonies via point cloud registration mapping algorithms.
 
+## Usage
+
+The compiled code for this project is usually provided as `.\iterative_closest_point.exe` in a folder with certain libraries (i.e. files ending in `.dll`).
+
+As you start the program with a command line invocation like:
+
+`.\iterative_closest_point.exe <input_file_before> <input_file_after> <output_directory>`
+
+a window will open. In this window, by clicking the left mouse button and dragging the mouse, you can shift the after distribution spatially. By right-clicking and dragging, you can change the scaling. This is kinda fiddly, I would not rely on it.
+
+By double clicking the left mouse button, you will trigger the automatic optimization of the match.
+
+Results will be written to `<output_directory>_mapping.txt` (a list of before and after indices) and `<output_directory>_all.txt` a file with the before indices, the before x and y position and the after index with its x and y position.
+
+To run, the program will try to load a configuration file (see section `Configuration` for options.) from the path `./conf/Config.ini` by default, but any path to the configuration file can be provided as option `-c <config_file_path>`.
+
+In this configuration file, minimum and maximum values for the attempted interval of stretch and shear in x and y direction respectively are provided.
+If you only want either stretch or shear to be optimized, choose minimum and maximum values very close to 1.0 for the other paramaters, i.e. `stretch_x_min 0.999` and `stretch_x_max 1.0001` if you do not want the stretch in x direction to be optimized.
+
+## Support: Errors and Bugs
+
+If there is an issue while using the library, do not hesitate to contact me at `kevin.hoellring@fau.de`.
+To be able to help you, it would be great, if you could provide the following things:
+
+- input before and after files
+- your config file or the information that you did not use a config file
+- the version of the program you are using, obtainable by invoking `.\iterative_closest_point.exe --version`. The output will provide you with all of the necessary information.
+- A description of the issue you are facing, e.g. "The program crashes when I double click", "The program does not seem to be able to load the input files", "The program crashes randomly with no error output", "The output files are empty or not produced", etc. so that I have an idea what I am looking for :)
+
 ## Quirks
 
 - After refactoring the code, I realized that the scale factor must be set in the configuration, so I fixed that to be 1.0 if not set.
