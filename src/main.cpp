@@ -28,11 +28,11 @@ struct Settings
 // Configuration options loaded at start
 struct Configuration
 {
-  float g_fSxMin = -std::numeric_limits<float>::max();
-  float g_fSxMax = std::numeric_limits<float>::max();
-  float g_fSyMin = -std::numeric_limits<float>::max();
-  float g_fSyMax = std::numeric_limits<float>::max();
-  float g_fScaling = 1.0;
+  float g_f_stretch_x_min = -std::numeric_limits<float>::max();
+  float g_f_stretch_x_max = std::numeric_limits<float>::max();
+  float g_f_stretch_y_min = -std::numeric_limits<float>::max();
+  float g_f_stretch_y_max = std::numeric_limits<float>::max();
+  float g_f_loadtime_scaling = 1.0;
 
   std::string positions_before_path; // Path to before point positions
   std::string positions_after_path;  // Path to after point positions
@@ -62,11 +62,11 @@ pcl::Correspondences all_correspondences;
 pcl::PointCloud<pcl::PointXY>::Ptr sourcePtr(&ptSource);
 pcl::PointCloud<pcl::PointXY>::Ptr targetPtr(&ptTargetNew);
 
-const std::string config_key_xscale_minimum = "Sx_Min";
-const std::string config_key_xscale_maximum = "Sx_Max";
-const std::string config_key_yscale_minimum = "Sy_Min";
-const std::string config_key_yscale_maximum = "Sy_Max";
-const std::string config_key_scaling_factor = "Scaling";
+const std::string config_key_xscale_minimum = "stretch_x_min";
+const std::string config_key_xscale_maximum = "stretch_x_max";
+const std::string config_key_yscale_minimum = "stretch_y_min";
+const std::string config_key_yscale_maximum = "stretch_y_max";
+const std::string config_key_scaling_factor = "loadtime_scaling";
 
 // Read configuration file
 bool readConfigFile(const std::string config_file_pathName, Configuration &config)
@@ -83,23 +83,23 @@ bool readConfigFile(const std::string config_file_pathName, Configuration &confi
       f.ignore();
       if (sKey == config_key_xscale_minimum)
       {
-        config.g_fSxMin = atof(sValue.data());
+        config.g_f_stretch_x_min = atof(sValue.data());
       }
       if (sKey == config_key_xscale_maximum)
       {
-        config.g_fSxMax = atof(sValue.data());
+        config.g_f_stretch_x_max = atof(sValue.data());
       }
       if (sKey == config_key_yscale_minimum)
       {
-        config.g_fSyMin = atof(sValue.data());
+        config.g_f_stretch_y_min = atof(sValue.data());
       }
       if (sKey == config_key_yscale_maximum)
       {
-        config.g_fSyMax = atof(sValue.data());
+        config.g_f_stretch_y_max = atof(sValue.data());
       }
       if (sKey == config_key_scaling_factor)
       {
-        config.g_fScaling = atof(sValue.data());
+        config.g_f_loadtime_scaling = atof(sValue.data());
       }
     }
     f.close();
@@ -195,7 +195,7 @@ void transformPointCloud(pcl::PointCloud<pcl::PointXY> &pcIn,
 float costFunction(float tx, float ty, float sx, float sy, const Configuration &config)
 {
   // Range limitation. Output infinite cost if cell outside of range of scales
-  if (sx < config.g_fSxMin || sx > config.g_fSxMax || sy < config.g_fSyMin || sy > config.g_fSyMax)
+  if (sx < config.g_f_stretch_x_min || sx > config.g_f_stretch_x_max || sy < config.g_f_stretch_y_min || sy > config.g_f_stretch_y_max)
     return FLT_MAX;
 
   imgMerged = imgFixed.clone();
@@ -399,11 +399,11 @@ int main(int argc, char **argv)
   Configuration config{};
 
   // Default settings for min, max and scaling during input
-  config.g_fSxMin = -std::numeric_limits<float>::max();
-  config.g_fSxMax = std::numeric_limits<float>::max();
-  config.g_fSyMin = -std::numeric_limits<float>::max();
-  config.g_fSyMax = std::numeric_limits<float>::max();
-  config.g_fScaling = 1.0;
+  config.g_f_stretch_x_min = -std::numeric_limits<float>::max();
+  config.g_f_stretch_x_max = std::numeric_limits<float>::max();
+  config.g_f_stretch_y_min = -std::numeric_limits<float>::max();
+  config.g_f_stretch_y_max = std::numeric_limits<float>::max();
+  config.g_f_loadtime_scaling = 1.0;
 
   // Debugging options
   config.debugging_enabled = false;
@@ -503,8 +503,8 @@ int main(int argc, char **argv)
   {
     // x *= 0.2;
     // y *= 0.2;
-    x *= config.g_fScaling;
-    y *= config.g_fScaling;
+    x *= config.g_f_loadtime_scaling;
+    y *= config.g_f_loadtime_scaling;
     pcl::PointXY pnt;
     pnt.x = x;
     pnt.y = y;
@@ -522,8 +522,8 @@ int main(int argc, char **argv)
   {
     // x *= 0.2;
     // y *= 0.2;
-    x *= config.g_fScaling;
-    y *= config.g_fScaling;
+    x *= config.g_f_loadtime_scaling;
+    y *= config.g_f_loadtime_scaling;
     pcl::PointXY pnt;
     pnt.x = x;
     pnt.y = y;
@@ -605,10 +605,10 @@ int main(int argc, char **argv)
         // all_correspondences.at(i).index_match << " " << pntTargetNew.x/0.2 <<
         // " " << pntTargetNew.y/0.2<<"\n";
         ooAll << all_correspondences.at(i).index_query << " "
-              << pntSource.x / config.g_fScaling << " " << pntSource.y / config.g_fScaling
+              << pntSource.x / config.g_f_loadtime_scaling << " " << pntSource.y / config.g_f_loadtime_scaling
               << " " << all_correspondences.at(i).index_match << " "
-              << pntTargetNew.x / config.g_fScaling << " "
-              << pntTargetNew.y / config.g_fScaling << "\n";
+              << pntTargetNew.x / config.g_f_loadtime_scaling << " "
+              << pntTargetNew.y / config.g_f_loadtime_scaling << "\n";
       }
       ooAll.flush();
       ooAll.close();
