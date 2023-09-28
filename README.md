@@ -14,12 +14,34 @@ a window will open. In this window, by clicking the left mouse button and draggi
 
 By double clicking the left mouse button, you will trigger the automatic optimization of the match.
 
+After the fitting is done or generally if you want to close the program, press the `ESC` on the keyboard while in the merge window or press `Ctrl+C` when in the command line window.
+If you do the latter, while the fit is still running, the output files may be empty or not fully there. So please consider when it is appropriate to force a shutdown of the program while it is running.
+
 Results will be written to `<output_directory>_mapping.txt` (a list of before and after indices) and `<output_directory>_all.txt` a file with the before indices, the before x and y position and the after index with its x and y position.
 
 To run, the program will try to load a configuration file (see section `Configuration` for options.) from the path `./conf/Config.ini` by default, but any path to the configuration file can be provided as option `-c <config_file_path>`.
 
 In this configuration file, minimum and maximum values for the attempted interval of stretch and shear in x and y direction respectively are provided.
 If you only want either stretch or shear to be optimized, choose minimum and maximum values very close to 1.0 for the other paramaters, i.e. `stretch_x_min 0.999` and `stretch_x_max 1.0001` if you do not want the stretch in x direction to be optimized.
+
+### Examples
+
+If you want to run a match of the files `input1.txt` and `input2.txt` using the configuration at `Config.ini` and write the results to `output/`, then the correct command would be:
+
+`.\iterative_closest_point.exe input1.txt input2.txt output/ -c Config.ini`
+
+or without a custom configuration:
+
+`.\iterative_closest_point.exe input1.txt input2.txt output/`
+
+Options are generally written in a style like `-o <value>` or `--long_option <value>`, where `o` and `long_option` are the names of the option to be set, either in short form (i.e. only one character) or in long form (i.e. usually a full word but no whitespaces allowed within that word).
+To get a list of all available options, use the option `-h`, i.e.
+
+`.\iterative_closest_point.exe -h`
+
+To get the version of the program that you are using, use `--version`, i.e.
+
+`.\iterative_closest_point.exe --version`
 
 ## Support: Errors and Bugs
 
