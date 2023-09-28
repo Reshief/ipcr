@@ -37,6 +37,12 @@ struct Configuration
   float g_f_stretch_x_max = std::numeric_limits<float>::max();
   float g_f_stretch_y_min = -std::numeric_limits<float>::max();
   float g_f_stretch_y_max = std::numeric_limits<float>::max();
+
+  float g_f_shear_x_min = -std::numeric_limits<float>::max();
+  float g_f_shear_x_max = std::numeric_limits<float>::max();
+  float g_f_shear_y_min = -std::numeric_limits<float>::max();
+  float g_f_shear_y_max = std::numeric_limits<float>::max();
+
   float g_f_loadtime_scaling = 1.0;
 
   std::string positions_before_path; // Path to before point positions
@@ -63,6 +69,10 @@ const std::string config_key_xscale_minimum = "stretch_x_min";
 const std::string config_key_xscale_maximum = "stretch_x_max";
 const std::string config_key_yscale_minimum = "stretch_y_min";
 const std::string config_key_yscale_maximum = "stretch_y_max";
+const std::string config_key_xshear_minimum = "shear_x_min";
+const std::string config_key_xshear_maximum = "shear_x_max";
+const std::string config_key_yshear_minimum = "shear_y_min";
+const std::string config_key_yshear_maximum = "shear_y_max";
 const std::string config_key_scaling_factor = "loadtime_scaling";
 
 // Read configuration file
@@ -78,6 +88,7 @@ bool readConfigFile(const std::string config_file_pathName, Configuration &confi
     {
       f >> sKey >> sValue;
       f.ignore();
+      // Read scaling/stretching config
       if (sKey == config_key_xscale_minimum)
       {
         config.g_f_stretch_x_min = atof(sValue.data());
@@ -94,6 +105,26 @@ bool readConfigFile(const std::string config_file_pathName, Configuration &confi
       {
         config.g_f_stretch_y_max = atof(sValue.data());
       }
+
+      // Read shear config
+      if (sKey == config_key_xshear_minimum)
+      {
+        config.g_f_shear_x_min = atof(sValue.data());
+      }
+      if (sKey == config_key_xshear_maximum)
+      {
+        config.g_f_shear_x_max = atof(sValue.data());
+      }
+      if (sKey == config_key_yshear_minimum)
+      {
+        config.g_f_shear_y_min = atof(sValue.data());
+      }
+      if (sKey == config_key_yshear_maximum)
+      {
+        config.g_f_shear_y_max = atof(sValue.data());
+      }
+
+      // Read load time scale config
       if (sKey == config_key_scaling_factor)
       {
         config.g_f_loadtime_scaling = atof(sValue.data());

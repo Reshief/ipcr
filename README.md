@@ -38,13 +38,19 @@ The configuration file should be a text-format file consisting of multiple rows,
 
 The following key and value pairs are supported:
 
-| Key                | Value                            | Purpose                                                                     |
-| ------------------ | -------------------------------- | --------------------------------------------------------------------------- |
-| `stretch_x_min`    | floating point number (e.g. 0.8) | Minimum scale/stretch in x direction to be considered                       |
-| `stretch_x_max`    | floating point number (e.g. 1.2) | Maximxum scale/stretch in x direction to be considered                      |
-| `stretch_y_min`    | floating point number (e.g. 0.8) | Minimum scale/stretch in y direction to be considered                       |
-| `stretch_y_max`    | floating point number (e.g. 1.2) | Maximxum scale/stretch in y direction to be considered                      |
-| `loadtime_scaling` | floating point number (e.g. 1.0) | Scale factor with which input coordinates are multiplied at time of loading |
+| Key                | Value                              | Purpose                                                                                 |
+| ------------------ | ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `stretch_x_min`    | floating point number (e.g. 0.8)   | Minimum scale/stretch in x direction to be considered                                   |
+| `stretch_x_max`    | floating point number (e.g. 1.2)   | Maximxum scale/stretch in x direction to be considered                                  |
+| `stretch_y_min`    | floating point number (e.g. 0.8)   | Minimum scale/stretch in y direction to be considered                                   |
+| `stretch_y_max`    | floating point number (e.g. 1.2)   | Maximxum scale/stretch in y direction to be considered                                  |
+| ------------------ | ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `shear_x_min`      | floating point number (e.g. -0.1)  | Minimum shear in x direction to be considered (negative for opposite shear direction)   |
+| `shear_x_max`      | floating point number (e.g. 0.1)   | Maximxum shear in x direction to be considered                                          |
+| `shear_y_min`      | floating point number (e.g. -0.1)  | Minimum shear in y direction to be considered (negative for opposite shear direction)   |
+| `shear_y_max`      | floating point number (e.g. 0.1)   | Maximxum shear in y direction to be considered                                          |
+| ------------------ | ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `loadtime_scaling` | floating point number (e.g. 1.0)   | Scale factor with which input coordinates are multiplied at time of loading             |
 
 ## Getting started
 
