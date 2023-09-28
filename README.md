@@ -31,6 +31,21 @@ For building the program it uses CMake. To build, a rather new compiler is requi
 | `sample_input` | Input files to test the point cloud matching algorithm      |
 | `src`          | source code for program                                     |
 
+## Configuration
+
+The program expects a configuration file at the path provided by the option `-c` or alternatively `--config_file` (default: `./conf/Config.ini`).
+The configuration file should be a text-format file consisting of multiple rows, with each row containing a key (i.e. a non-whitespace separated string) then a whitespace and then the value associated with that key again with no whitespace.
+
+The following key and value pairs are supported:
+
+| Key                | Value                            | Purpose                                                                     |
+| ------------------ | -------------------------------- | --------------------------------------------------------------------------- |
+| `stretch_x_min`    | floating point number (e.g. 0.8) | Minimum scale/stretch in x direction to be considered                       |
+| `stretch_x_max`    | floating point number (e.g. 1.2) | Maximxum scale/stretch in x direction to be considered                      |
+| `stretch_y_min`    | floating point number (e.g. 0.8) | Minimum scale/stretch in y direction to be considered                       |
+| `stretch_y_max`    | floating point number (e.g. 1.2) | Maximxum scale/stretch in y direction to be considered                      |
+| `loadtime_scaling` | floating point number (e.g. 1.0) | Scale factor with which input coordinates are multiplied at time of loading |
+
 ## Getting started
 
 To make it easy for you to get started with GitLab, here's a list of recommended next steps.
