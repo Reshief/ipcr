@@ -45,6 +45,7 @@ link_directories(${PCL_LIBRARY_DIRS} ${OpenCV_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 # add automatic git version tracking
+# based on: https://github.com/andrew-hardin/cmake-git-version-tracking
 include(FetchContent)
 FetchContent_Declare(cmake_git_version_tracking                   
   GIT_REPOSITORY https://github.com/andrew-hardin/cmake-git-version-tracking.git
