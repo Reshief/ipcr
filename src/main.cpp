@@ -66,7 +66,6 @@ Settings settings;
 
 // Rendering targets for the output of the program
 cv::Mat imgFixed = cv::Mat::zeros(1024, 1024, CV_8UC3);
-cv::Mat imgMerged = cv::Mat::zeros(1024, 1024, CV_8UC3);
 
 // String keys for finding the options in the configuration file.
 const std::string config_key_xscale_minimum = "stretch_x_min";
@@ -196,22 +195,30 @@ void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
 }
 
 // Transformation calculation
-void transformPointCloud(const PCl2D &pcIn,
-                         PCl2D &pcOut, float tx,
-                         float ty, float sx, float sy)
+void transformPointCloud(const PCl2D &pcIn, PCl2D &pcOut,
+                         float translate_x, float translate_y,
+                         float stretch_x, float stretch_y,
+                         float shear_x, float shear_y)
 {
   cv::Mat matTransfo = cv::Mat::eye(3, 3, CV_32F);
-  matTransfo.at<float>(0, 0) *= sx;
-  matTransfo.at<float>(1, 0) *= sx;
+  // configure shear
+  matTransfo.at<float>(0, 1) += shear_x;
+  matTransfo.at<float>(1, 0) += shear_y;
+  matTransfo.at<float>(0, 0) += shear_y * shear_x;
 
-  matTransfo.at<float>(0, 1) *= sy;
-  matTransfo.at<float>(1, 1) *= sy;
+  // configure stretch
+  matTransfo.at<float>(0, 0) *= stretch_x;
+  matTransfo.at<float>(1, 0) *= stretch_x;
 
-  matTransfo.at<float>(0, 2) = tx;
-  matTransfo.at<float>(1, 2) = ty;
+  matTransfo.at<float>(0, 1) *= stretch_y;
+  matTransfo.at<float>(1, 1) *= stretch_y;
+
+  // configure displacement
+  matTransfo.at<float>(0, 2) = translate_x;
+  matTransfo.at<float>(1, 2) = translate_y;
 
   cv::Mat pntIn = cv::Mat::ones(3, 1, CV_32F);
-  cv::Mat pntOut = cv::Mat::ones(3, 1, CV_32F);
+  cv::Mat pntOut;
   pcOut.resize(pcIn.size());
   for (int i = 0; i < pcIn.size(); ++i)
   {
@@ -226,16 +233,16 @@ void transformPointCloud(const PCl2D &pcIn,
 }
 
 // Calculation of cost function, tx,ty: translation; sx, sy: scaling
-float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, float tx, float ty, float sx, float sy, const Configuration &config)
+float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, float translate_x, float translate_y, float stretch_x, float stretch_y, float shear_x, float shear_y, const Configuration &config)
 {
   // Range limitation. Output infinite cost if cell outside of range of scales
-  if (sx < config.g_f_stretch_x_min || sx > config.g_f_stretch_x_max || sy < config.g_f_stretch_y_min || sy > config.g_f_stretch_y_max)
+  if (stretch_x < config.g_f_stretch_x_min || stretch_x > config.g_f_stretch_x_max || stretch_y < config.g_f_stretch_y_min || stretch_y > config.g_f_stretch_y_max || shear_x < config.g_f_shear_x_min || shear_x > config.g_f_shear_x_max || shear_y < config.g_f_shear_y_min || shear_y > config.g_f_shear_y_max)
     return FLT_MAX;
 
-  imgMerged = imgFixed.clone();
+  cv::Mat imgMerged = imgFixed.clone();
 
   PCl2D target_New;
-  transformPointCloud(*targetPtr, target_New, tx, ty, sx, sy);
+  transformPointCloud(*targetPtr, target_New, translate_x, translate_y, stretch_x, stretch_y, shear_x, shear_y);
   for (int i = 0; i < target_New.size(); ++i)
   {
     cv::circle(imgMerged, cv::Point(target_New.at(i).x, target_New.at(i).y),
@@ -269,7 +276,7 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, float tx, f
 }
 
 // CMA-ES optimization
-void doCMAES(const PClPtr &source, const PClPtr &target, float tx, float ty, float sx, float sy, const Configuration &config)
+void doCMAES(const PClPtr &source, const PClPtr &target, float translate_x, float translate_y, float stretch_x, float stretch_y, float shear_x, float shear_y, const Configuration &config)
 {
   CMAES<float> evo;  // the optimizer
   float *const *pop; // sampled population
@@ -287,30 +294,39 @@ void doCMAES(const PClPtr &source, const PClPtr &target, float tx, float ty, flo
           and as value read from signals.par by calling evo.readSignals
           explicitely.
     */
-  const int dim = 4;
+  const int dim = 6;
   float xstart[dim];
-  xstart[0] = tx;
-  xstart[1] = ty;
-  xstart[2] = sx;
-  xstart[3] = sy;
+  xstart[0] = translate_x;
+  xstart[1] = translate_y;
+  xstart[2] = stretch_x;
+  xstart[3] = stretch_y;
+  xstart[4] = shear_x;
+  xstart[5] = shear_y;
 
   float stddev[dim];
   stddev[0] = 2;
   stddev[1] = 2;
   stddev[2] = 5;
   stddev[3] = 5;
+  stddev[4] = 5;
+  stddev[5] = 5;
 
   float lb[dim];
   lb[0] = xstart[0] - 20;
   lb[1] = xstart[1] - 20;
   lb[2] = xstart[2] - 20;
   lb[3] = xstart[3] - 20;
+  lb[4] = xstart[4] - 20;
+  lb[5] = xstart[5] - 20;
 
   float ub[dim];
   ub[0] = xstart[0] + 20;
   ub[1] = xstart[1] + 20;
   ub[2] = xstart[2] + 20;
   ub[3] = xstart[3] + 20;
+  ub[4] = xstart[4] + 20;
+  ub[5] = xstart[5] + 20;
+
   Parameters<float> parameters;
   // You can resume a previous run by specifying a file that contains the
   // resume data:
@@ -358,7 +374,7 @@ void doCMAES(const PClPtr &source, const PClPtr &target, float tx, float ty, flo
                 evo.reSampleSingle(i);
       */
       fitvals[i] = costFunction(source, target, pop[i][0], pop[i][1], 1.0 + pop[i][2] * 0.01,
-                                1.0 + pop[i][3] * 0.01, config);
+                                1.0 + pop[i][3] * 0.01, pop[i][4], pop[i][5], config);
     }
     // update search distribution
     evo.updateDistribution(fitvals);
@@ -377,6 +393,8 @@ void doCMAES(const PClPtr &source, const PClPtr &target, float tx, float ty, flo
   settings.g_f_translate_y = xbestever[1];
   settings.g_f_stretch_x = xbestever[2] * 0.01 + 1.0;
   settings.g_f_stretch_y = xbestever[3] * 0.01 + 1.0;
+  settings.g_f_shear_x = xbestever[4];
+  settings.g_f_shear_y = xbestever[5];
 }
 
 bool replace(std::string &str, const std::string &from, const std::string &to)
@@ -567,7 +585,7 @@ int main(int argc, char **argv)
                   cv::Scalar(255, 100, 0), -1);
     sourcePtr->push_back(pnt);
   }
-  imgMerged = imgFixed.clone();
+  cv::Mat imgMerged = imgFixed.clone();
 
   // read and plot the target point cloud
   while (infileTar >> x >> y)
