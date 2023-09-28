@@ -707,7 +707,6 @@ int main(int argc, char **argv)
       std::string ooall_path = config.output_prefix + "_all.txt";
       std::ofstream ooAll;
 
-      std::ofstream oo;
       ooAll.open(ooall_path);
 
       if (!ooAll.is_open() || !ooAll.good())
@@ -717,7 +716,7 @@ int main(int argc, char **argv)
       }
 
       print_version_info(ooAll, "#\t");
-      
+
       for (int i = 0; i < all_correspondences.size(); ++i)
       {
         pcl::PointXY pntSource;
