@@ -678,7 +678,16 @@ int main(int argc, char **argv)
 
       // Output the new correspondences
       std::ofstream oo;
-      oo.open(config.output_prefix + "_mapping.txt");
+      std::string oo_path = config.output_prefix + "_mapping.txt";
+      oo.open(oo_path);
+
+      if (!oo.is_open() || !oo.good())
+      {
+        std::cerr << "[ERROR]:\tFailed to open output file: " << oo_path << std::endl;
+        exit(EXIT_FAILURE);
+      }
+
+      print_version_info(oo, "#\t");
       est.setInputCloud(sourcePtr);
       est.setInputTarget(targetPtr);
 
@@ -695,9 +704,20 @@ int main(int argc, char **argv)
       oo.close();
 
       // Output all info for the correspondences
-      std::string sOutAll = config.output_prefix + "_all.txt";
+      std::string ooall_path = config.output_prefix + "_all.txt";
       std::ofstream ooAll;
-      ooAll.open(sOutAll);
+
+      std::ofstream oo;
+      ooAll.open(ooall_path);
+
+      if (!ooAll.is_open() || !ooAll.good())
+      {
+        std::cerr << "[ERROR]:\tFailed to open output file: " << ooall_path << std::endl;
+        exit(EXIT_FAILURE);
+      }
+
+      print_version_info(ooAll, "#\t");
+      
       for (int i = 0; i < all_correspondences.size(); ++i)
       {
         pcl::PointXY pntSource;
