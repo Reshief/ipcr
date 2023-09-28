@@ -607,7 +607,7 @@ int main(int argc, char **argv)
   {
     PCl2D target_tmp;
     imgMerged = imgFixed.clone();
-    transformPointCloud(*targetPtr, target_tmp, settings.g_f_translate_x, settings.g_f_translate_y, settings.g_f_stretch_x, settings.g_f_stretch_y);
+    transformPointCloud(*targetPtr, target_tmp, settings.g_f_translate_x, settings.g_f_translate_y, settings.g_f_stretch_x, settings.g_f_stretch_y, settings.g_f_shear_x, settings.g_f_shear_y);
     for (int i = 0; i < target_tmp.size(); ++i)
     {
       cv::circle(imgMerged, cv::Point(target_tmp.at(i).x, target_tmp.at(i).y),
@@ -643,7 +643,7 @@ int main(int argc, char **argv)
     // Optimize the transformation based on current correspondences
     if (settings.g_bDoCmaes == true)
     {
-      doCMAES(sourcePtr, targetPtr, settings.g_f_translate_x, settings.g_f_translate_y, (settings.g_f_stretch_x - 1.0) * 100.0, (settings.g_f_stretch_y - 1.0) * 100.0, config);
+      doCMAES(sourcePtr, targetPtr, settings.g_f_translate_x, settings.g_f_translate_y, (settings.g_f_stretch_x - 1.0) * 100.0, (settings.g_f_stretch_y - 1.0) * 100.0, settings.g_f_shear_x, settings.g_f_shear_y, config);
       settings.g_bDoCmaes = false;
 
       // Output the new correspondences
