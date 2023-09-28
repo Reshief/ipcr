@@ -508,12 +508,7 @@ int main(int argc, char **argv)
 
     if (result.count("version"))
     {
-      std::cout << "\t" << argv[0] << std::endl;
-      std::cout << "Version:" << std::endl;
-      std::cout << "OS:" << std::endl;
-      std::cout << "Built on:" << std::endl;
-      std::cout << "Git branch:" << std::endl;
-      std::cout << "Git commit:" << std::endl;
+      print_version_info(std::cout);
 
       exit(EXIT_SUCCESS);
     }
