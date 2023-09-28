@@ -20,8 +20,12 @@ typedef PCl2D::Ptr PClPtr;
 // Runtime-modified settings of the program
 struct Settings
 {
-  // Translation and Scaling according to the screen input using mouse
-  float g_fTx, g_fTy, g_fSx, g_fSy;
+  // Translation according to the screen input using mouse and evolutionary fit
+  float g_f_translate_x, g_f_translate_y;
+  // Scaling according to the screen input using mouse and evolutionary fit
+  float g_f_stretch_x, g_f_stretch_y;
+  // Scaling according to our evolutionary fit
+  float g_f_shear_x, g_f_shear_y;
 
   // Mouse button event flags
   bool g_bEventLButtonDown;
@@ -175,14 +179,14 @@ void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
     pntCur[1] = y;
     if (settings.g_bEventLButtonDown == true)
     {
-      settings.g_fTx = pntCur[0] - pntBegin[0];
-      settings.g_fTy = pntCur[1] - pntBegin[1];
+      settings.g_f_translate_x = pntCur[0] - pntBegin[0];
+      settings.g_f_translate_y = pntCur[1] - pntBegin[1];
     }
 
     if (settings.g_bEventRButtonDown == true)
     {
-      settings.g_fSx = settings.g_fSx + (pntCur[0] - pntBegin[0]) * 0.001;
-      settings.g_fSy = settings.g_fSy + (pntCur[1] - pntBegin[1]) * 0.001;
+      settings.g_f_stretch_x = settings.g_f_stretch_x + (pntCur[0] - pntBegin[0]) * 0.001;
+      settings.g_f_stretch_y = settings.g_f_stretch_y + (pntCur[1] - pntBegin[1]) * 0.001;
     }
   }
   else if (event == cv::EVENT_LBUTTONDBLCLK)
@@ -369,10 +373,10 @@ void doCMAES(const PClPtr &source, const PClPtr &target, float tx, float ty, flo
                             xbestever); // allocates memory if needed
   }
 
-  settings.g_fTx = xbestever[0];
-  settings.g_fTy = xbestever[1];
-  settings.g_fSx = xbestever[2] * 0.01 + 1.0;
-  settings.g_fSy = xbestever[3] * 0.01 + 1.0;
+  settings.g_f_translate_x = xbestever[0];
+  settings.g_f_translate_y = xbestever[1];
+  settings.g_f_stretch_x = xbestever[2] * 0.01 + 1.0;
+  settings.g_f_stretch_y = xbestever[3] * 0.01 + 1.0;
 }
 
 bool replace(std::string &str, const std::string &from, const std::string &to)
@@ -432,11 +436,19 @@ int main(int argc, char **argv)
 
   Configuration config{};
 
-  // Default settings for min, max and scaling during input
+  // Default settings for min, max of directional saling
   config.g_f_stretch_x_min = -std::numeric_limits<float>::max();
   config.g_f_stretch_x_max = std::numeric_limits<float>::max();
   config.g_f_stretch_y_min = -std::numeric_limits<float>::max();
   config.g_f_stretch_y_max = std::numeric_limits<float>::max();
+
+  // default settings for shear
+  config.g_f_shear_x_min = -std::numeric_limits<float>::max();
+  config.g_f_shear_x_max = std::numeric_limits<float>::max();
+  config.g_f_shear_y_min = -std::numeric_limits<float>::max();
+  config.g_f_shear_y_max = std::numeric_limits<float>::max();
+
+  // default setting for scaling during input
   config.g_f_loadtime_scaling = 1.0;
 
   // Debugging options
@@ -516,10 +528,12 @@ int main(int argc, char **argv)
   }
 
   settings.g_bDoCmaes = false;
-  settings.g_fTx = 0;
-  settings.g_fTy = 0;
-  settings.g_fSx = 1.0;
-  settings.g_fSy = 1.0;
+  settings.g_f_translate_x = 0;
+  settings.g_f_translate_y = 0;
+  settings.g_f_stretch_x = 1.0;
+  settings.g_f_stretch_y = 1.0;
+  settings.g_f_shear_x = 0.0;
+  settings.g_f_shear_y = 0.0;
 
   readConfigFile(config.config_file_path, config);
 
@@ -575,7 +589,7 @@ int main(int argc, char **argv)
   {
     PCl2D target_tmp;
     imgMerged = imgFixed.clone();
-    transformPointCloud(*targetPtr, target_tmp, settings.g_fTx, settings.g_fTy, settings.g_fSx, settings.g_fSy);
+    transformPointCloud(*targetPtr, target_tmp, settings.g_f_translate_x, settings.g_f_translate_y, settings.g_f_stretch_x, settings.g_f_stretch_y);
     for (int i = 0; i < target_tmp.size(); ++i)
     {
       cv::circle(imgMerged, cv::Point(target_tmp.at(i).x, target_tmp.at(i).y),
@@ -611,7 +625,7 @@ int main(int argc, char **argv)
     // Optimize the transformation based on current correspondences
     if (settings.g_bDoCmaes == true)
     {
-      doCMAES(sourcePtr, targetPtr, settings.g_fTx, settings.g_fTy, (settings.g_fSx - 1.0) * 100.0, (settings.g_fSy - 1.0) * 100.0, config);
+      doCMAES(sourcePtr, targetPtr, settings.g_f_translate_x, settings.g_f_translate_y, (settings.g_f_stretch_x - 1.0) * 100.0, (settings.g_f_stretch_y - 1.0) * 100.0, config);
       settings.g_bDoCmaes = false;
 
       // Output the new correspondences
