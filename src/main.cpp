@@ -443,8 +443,10 @@ int main(int argc, char **argv)
              "true")) // Flag to enable verbose output
         ("d,debug", "Enable debugging.",
          cxxopts::value<bool>()->default_value("false")->implicit_value(
-             "true")) // a bool parameter to enable debugging
-        ("h,help", "Print usage.");
+             "true"))                        // a bool parameter to enable debugging
+        ("h,help", "Print usage.")           // allow help to display
+        ("version", "Display version info.") // display version info below
+        ;
 
     // Make input and output positional arguments
     options.parse_positional({"input_before", "input_after", "output_prefix"});
@@ -486,6 +488,18 @@ int main(int argc, char **argv)
     if (result.count("help"))
     {
       std::cout << options.help() << std::endl;
+      exit(EXIT_SUCCESS);
+    }
+
+    if (result.count("version"))
+    {
+      std::cout << "\t" << argv[0] << std::endl;
+      std::cout << "Version:" << std::endl;
+      std::cout << "OS:" << std::endl;
+      std::cout << "Built on:" << std::endl;
+      std::cout << "Git branch:" << std::endl;
+      std::cout << "Git commit:" << std::endl;
+
       exit(EXIT_SUCCESS);
     }
 
