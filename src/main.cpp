@@ -303,29 +303,29 @@ void doCMAES(const PClPtr &source, const PClPtr &target, float translate_x, floa
   xstart[4] = shear_x;
   xstart[5] = shear_y;
 
-  float stddev[dim];
-  stddev[0] = 2;
-  stddev[1] = 2;
-  stddev[2] = 5;
-  stddev[3] = 5;
-  stddev[4] = 5;
-  stddev[5] = 5;
-
   float lb[dim];
   lb[0] = xstart[0] - 20;
   lb[1] = xstart[1] - 20;
-  lb[2] = xstart[2] - 20;
-  lb[3] = xstart[3] - 20;
-  lb[4] = xstart[4] - 20;
-  lb[5] = xstart[5] - 20;
+  lb[2] = (config.g_f_stretch_x_min - 1.) * 100;
+  lb[3] = (config.g_f_stretch_y_min - 1.) * 100;
+  lb[4] = (config.g_f_shear_x_min) * 100;
+  lb[5] = (config.g_f_shear_y_min) * 100;
 
   float ub[dim];
   ub[0] = xstart[0] + 20;
   ub[1] = xstart[1] + 20;
-  ub[2] = xstart[2] + 20;
-  ub[3] = xstart[3] + 20;
-  ub[4] = xstart[4] + 20;
-  ub[5] = xstart[5] + 20;
+  ub[2] = (config.g_f_stretch_y_max - 1.) * 100;
+  ub[3] = (config.g_f_stretch_y_max - 1.) * 100;
+  ub[4] = (config.g_f_shear_x_max) * 100;
+  ub[5] = (config.g_f_shear_y_max) * 100;
+
+  float stddev[dim];
+  stddev[0] = 2;
+  stddev[1] = 2;
+  stddev[2] = std::min(5., (ub[2] - lb[2]) / 3.);
+  stddev[3] = std::min(5., (ub[3] - lb[3]) / 3.);
+  stddev[4] = std::min(5., (ub[4] - lb[4]) / 3.);
+  stddev[5] = std::min(5., (ub[5] - lb[5]) / 3.);
 
   Parameters<float> parameters;
   // You can resume a previous run by specifying a file that contains the
@@ -374,7 +374,7 @@ void doCMAES(const PClPtr &source, const PClPtr &target, float translate_x, floa
                 evo.reSampleSingle(i);
       */
       fitvals[i] = costFunction(source, target, pop[i][0], pop[i][1], 1.0 + pop[i][2] * 0.01,
-                                1.0 + pop[i][3] * 0.01, pop[i][4], pop[i][5], config);
+                                1.0 + pop[i][3] * 0.01, pop[i][4] * 0.01, pop[i][5] * 0.01, config);
     }
     // update search distribution
     evo.updateDistribution(fitvals);
@@ -393,8 +393,12 @@ void doCMAES(const PClPtr &source, const PClPtr &target, float translate_x, floa
   settings.g_f_translate_y = xbestever[1];
   settings.g_f_stretch_x = xbestever[2] * 0.01 + 1.0;
   settings.g_f_stretch_y = xbestever[3] * 0.01 + 1.0;
-  settings.g_f_shear_x = xbestever[4];
-  settings.g_f_shear_y = xbestever[5];
+  settings.g_f_shear_x = xbestever[4] * 0.01;
+  settings.g_f_shear_y = xbestever[5] * 0.01;
+
+  std::cout << "translate: [" << settings.g_f_translate_x << "|" << settings.g_f_translate_y << "]" << std::endl;
+  std::cout << "stretch: [" << settings.g_f_stretch_x << "|" << settings.g_f_stretch_y << "]" << std::endl;
+  std::cout << "shear: [" << settings.g_f_shear_x << "|" << settings.g_f_shear_y << "]" << std::endl;
 }
 
 bool replace(std::string &str, const std::string &from, const std::string &to)
@@ -645,7 +649,7 @@ int main(int argc, char **argv)
     // Optimize the transformation based on current correspondences
     if (settings.g_bDoCmaes == true)
     {
-      doCMAES(sourcePtr, targetPtr, settings.g_f_translate_x, settings.g_f_translate_y, (settings.g_f_stretch_x - 1.0) * 100.0, (settings.g_f_stretch_y - 1.0) * 100.0, settings.g_f_shear_x, settings.g_f_shear_y, config);
+      doCMAES(sourcePtr, targetPtr, settings.g_f_translate_x, settings.g_f_translate_y, (settings.g_f_stretch_x - 1.0) * 100.0, (settings.g_f_stretch_y - 1.0) * 100.0, settings.g_f_shear_x * 100.0, settings.g_f_shear_y * 100.0, config);
       settings.g_bDoCmaes = false;
 
       // Output the new correspondences
