@@ -6,20 +6,28 @@ Program to map before and after stretch/shear images of cell colonies via point 
 
 - After refactoring the code, I realized that the scale factor must be set in the configuration, so I fixed that to be 1.0 if not set.
 - If no configuration is provided, certain default settings are applied (no scaling, no minimum scale, no maximum scale)
-- As far as I can tell, the code does not allow for shear matching, it just performs translation and stretching.
-- still crashes on shutdown due to faulty use of shared_ptr on const reference.
+- I added shearing to the code. If shear or stretching should be disabled, the upper and lower boundary values should be set close to 1.0 so that there is almost no range for a spread in those values.
+- A crash on shutdown of the program was fixed.
 
 ## Dependencies
 
 This code depends on
 
+- git for version control and submodules (needs to be installed)
+- CMake for building (needs to be installed)
 - OpenCV (version 4.8.0)
 - PCL (version PCL-1.13.1)
 - QT, GTK for window output
 - Eigen library (version 3.4.0 for PCL if building it yourself)
-- cxxopts (for command line argument parsing)
+- cxxopts (for command line argument parsing, provided as a submodule)
 
-For building the program it uses CMake. To build, a rather new compiler is required. On Windows, this makes Visual Studio (2022 or later) necessary, on Linux, clang or the gnu c++ compiler should be fine.
+For building the program it uses CMake, which needs to be installed. To build, a rather new compiler is required. On Windows, this makes Visual Studio (2022 or later) necessary, on Linux, clang or the gnu c++ compiler should be fine.
+
+The library cxxopts is included as a submodule to this repository. To download the necessary files, use `git submodule init` and then `git submodule update`. If this doesn't work, check the current git submodule documentation online for how to download submodules.
+
+Installing these tools proved to be more complex than I had expected. On Windows, I recommend downloading vcpkg, then installing with .\vcpkg.exe install eigen pcl qt5 opencv.
+Afterwards, it needs to be integrated using .\vcpkg.exe integrate install.
+Then the libraries should be available to cmake.
 
 ## Directories
 
