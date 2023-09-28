@@ -1,5 +1,6 @@
 #include "cmaes.h"
 #include "parameters.h"
+#include "version.hpp"
 #include <cxxopts.hpp>
 #include <fstream>
 #include <iostream>
@@ -11,6 +12,7 @@
 #include <pcl/registration/correspondence_estimation.h>
 #include <pcl/registration/icp.h>
 #include <limits>
+#include <git.h>
 
 // 2d Point cloud datatype
 typedef pcl::PointCloud<pcl::PointXY> PCl2D;
@@ -408,6 +410,19 @@ bool replace(std::string &str, const std::string &from, const std::string &to)
     return false;
   str.replace(start_pos, from.length(), to);
   return true;
+}
+
+void print_version_info(std::ostream &stream, const std::string &line_prefix = "")
+{
+  stream << line_prefix << "VERSION INFORMATION" << std::endl;
+  stream << line_prefix << "Program version: " << icp::get_version() << std::endl;
+  if (git::IsPopulated())
+  {
+    stream << line_prefix << "GIT Branch:" << git::Branch() << std::endl;
+    stream << line_prefix << "GIT Commit:" << git::CommitSHA1() << std::endl;
+    stream << line_prefix << "GIT Has uncommitted changes:" << git::AnyUncommittedChanges() << std::endl;
+    stream << line_prefix << "GIT Commit date:" << git::CommitDate() << std::endl;
+  }
 }
 
 int main(int argc, char **argv)

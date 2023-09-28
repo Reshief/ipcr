@@ -44,6 +44,15 @@ include_directories(${PCL_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS} ${OpenCV_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+# add automatic git version tracking
+include(FetchContent)
+FetchContent_Declare(cmake_git_version_tracking                   
+  GIT_REPOSITORY https://github.com/andrew-hardin/cmake-git-version-tracking.git
+  GIT_TAG 904dbda1336ba4b9a1415a68d5f203f576b696bb
+)
+FetchContent_MakeAvailable(cmake_git_version_tracking)
+
+
 ###################################################################################################
 # HEADER FILES
 ###################################################################################################
@@ -72,4 +81,5 @@ add_executable (iterative_closest_point ${SOURCES})
 target_include_directories(iterative_closest_point PUBLIC ${OpenCV_INCLUDE_DIRS} PUBLIC ${PCL_INCLUDE_DIRS})
 target_link_libraries (iterative_closest_point PRIVATE ${OpenCV_LIBS} cxxopts::cxxopts)
 target_link_libraries (iterative_closest_point PRIVATE ${PCL_LIBRARIES} )
+target_link_libraries(iterative_closest_point PRIVATE cmake_git_version_tracking)
 # target_link_libraries(iterative_closest_point PRIVATE ${PCL_LIBRARIES} opencv_ml opencv_dnn opencv_core opencv_flann cxxopts::cxxopts)
