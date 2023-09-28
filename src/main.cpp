@@ -545,6 +545,8 @@ int main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
+  // TODO: Make settings local. It should not be a global variable
+
   settings.g_bDoCmaes = false;
   settings.g_f_translate_x = 0;
   settings.g_f_translate_y = 0;
