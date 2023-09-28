@@ -12,6 +12,11 @@
 #include <pcl/registration/icp.h>
 #include <limits>
 
+// 2d Point cloud datatype
+typedef pcl::PointCloud<pcl::PointXY> PCl2D;
+// Shared pointer to a 2d pointcloud
+typedef PCl2D::Ptr PClPtr;
+
 // Runtime-modified settings of the program
 struct Settings
 {
@@ -49,19 +54,11 @@ struct Configuration
 // Global setting object
 Settings settings;
 
-cv::Vec2f pntCur, pntBegin;
+// Rendering targets for the output of the program
 cv::Mat imgFixed = cv::Mat::zeros(1024, 1024, CV_8UC3);
 cv::Mat imgMerged = cv::Mat::zeros(1024, 1024, CV_8UC3);
-pcl::PointCloud<pcl::PointXY> ptSource, ptTarget, ptTargetNew;
-pcl::registration::CorrespondenceEstimation<pcl::PointXY, pcl::PointXY> est;
-pcl::Correspondences all_correspondences;
 
-// TODO: These are Boost shared_ptr aliases, so the pointer must point to an
-// allocated piece of memory, not to a reference on the stack or the program
-// will crash at the end (as it does)
-pcl::PointCloud<pcl::PointXY>::Ptr sourcePtr(&ptSource);
-pcl::PointCloud<pcl::PointXY>::Ptr targetPtr(&ptTargetNew);
-
+// String keys for finding the options in the configuration file.
 const std::string config_key_xscale_minimum = "stretch_x_min";
 const std::string config_key_xscale_maximum = "stretch_x_max";
 const std::string config_key_yscale_minimum = "stretch_y_min";
@@ -115,6 +112,8 @@ bool readConfigFile(const std::string config_file_pathName, Configuration &confi
 // Mouse control
 void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
 {
+  // Current and previous mouse pointer positions for distance calculations
+  cv::Vec2f pntCur, pntBegin;
   if (event == cv::EVENT_LBUTTONDOWN)
   {
     settings.g_bEventLButtonDown = true;
@@ -162,8 +161,8 @@ void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
 }
 
 // Transformation calculation
-void transformPointCloud(pcl::PointCloud<pcl::PointXY> &pcIn,
-                         pcl::PointCloud<pcl::PointXY> &pcOut, float tx,
+void transformPointCloud(const PCl2D &pcIn,
+                         PCl2D &pcOut, float tx,
                          float ty, float sx, float sy)
 {
   cv::Mat matTransfo = cv::Mat::eye(3, 3, CV_32F);
@@ -192,19 +191,24 @@ void transformPointCloud(pcl::PointCloud<pcl::PointXY> &pcIn,
 }
 
 // Calculation of cost function, tx,ty: translation; sx, sy: scaling
-float costFunction(float tx, float ty, float sx, float sy, const Configuration &config)
+float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, float tx, float ty, float sx, float sy, const Configuration &config)
 {
   // Range limitation. Output infinite cost if cell outside of range of scales
   if (sx < config.g_f_stretch_x_min || sx > config.g_f_stretch_x_max || sy < config.g_f_stretch_y_min || sy > config.g_f_stretch_y_max)
     return FLT_MAX;
 
   imgMerged = imgFixed.clone();
-  transformPointCloud(ptTarget, ptTargetNew, tx, ty, sx, sy);
-  for (int i = 0; i < ptTargetNew.size(); ++i)
+
+  PCl2D target_New;
+  transformPointCloud(*targetPtr, target_New, tx, ty, sx, sy);
+  for (int i = 0; i < target_New.size(); ++i)
   {
-    cv::circle(imgMerged, cv::Point(ptTargetNew.at(i).x, ptTargetNew.at(i).y),
+    cv::circle(imgMerged, cv::Point(target_New.at(i).x, target_New.at(i).y),
                3, cv::Scalar(0, 255, 255), -1);
   }
+
+  pcl::registration::CorrespondenceEstimation<pcl::PointXY, pcl::PointXY> est;
+  pcl::Correspondences all_correspondences;
 
   cv::imshow("Merge", imgMerged);
   char szKey = cv::waitKey(10);
@@ -214,7 +218,6 @@ float costFunction(float tx, float ty, float sx, float sy, const Configuration &
   est.setInputTarget(targetPtr);
 
   // Determine all reciprocal correspondences
-
   est.determineReciprocalCorrespondences(all_correspondences);
 
   float err = 0;
@@ -231,7 +234,7 @@ float costFunction(float tx, float ty, float sx, float sy, const Configuration &
 }
 
 // CMA-ES optimization
-void doCMAES(float tx, float ty, float sx, float sy, const Configuration &config)
+void doCMAES(const PClPtr &source, const PClPtr &target, float tx, float ty, float sx, float sy, const Configuration &config)
 {
   CMAES<float> evo;  // the optimizer
   float *const *pop; // sampled population
@@ -319,7 +322,7 @@ void doCMAES(float tx, float ty, float sx, float sy, const Configuration &config
       /* while (!is_feasible(pop[i]))
                 evo.reSampleSingle(i);
       */
-      fitvals[i] = costFunction(pop[i][0], pop[i][1], 1.0 + pop[i][2] * 0.01,
+      fitvals[i] = costFunction(source, target, pop[i][0], pop[i][1], 1.0 + pop[i][2] * 0.01,
                                 1.0 + pop[i][3] * 0.01, config);
     }
     // update search distribution
@@ -497,6 +500,10 @@ int main(int argc, char **argv)
   // std::ifstream inAreaFileSrc(area_before_path); // unused
   // std::ifstream inAreaFileTar(area_after_path); // unused
 
+  // pointers initialized with actually allocated data to prevent crashes on cleanup
+  PClPtr sourcePtr = std::make_shared<PCl2D>();
+  PClPtr targetPtr = std::make_shared<PCl2D>();
+
   float x, y;
   // read and plot the srouce point cloud
   while (infileSrc >> x >> y)
@@ -513,7 +520,7 @@ int main(int argc, char **argv)
     // cv::circle(imgFixed, cv::Point(x,y), 3, cv::Scalar(0,255,0),-1); //1
     cv::rectangle(imgFixed, cv::Point(x - 2, y - 2), cv::Point(x + 2, y + 2),
                   cv::Scalar(255, 100, 0), -1);
-    ptSource.push_back(pnt);
+    sourcePtr->push_back(pnt);
   }
   imgMerged = imgFixed.clone();
 
@@ -527,28 +534,33 @@ int main(int argc, char **argv)
     pcl::PointXY pnt;
     pnt.x = x;
     pnt.y = y;
-    ptTarget.push_back(pnt);
+    targetPtr->push_back(pnt);
     cv::circle(imgMerged, cv::Point(x, y), 3, cv::Scalar(0, 255, 255), -1);
   }
 
-  std::cout << "Press 'space bar' to quit" << std::endl;
+  std::cout << "Press 'ESC' to quit" << std::endl;
+
   while (true)
   {
+    PCl2D target_tmp;
     imgMerged = imgFixed.clone();
-    transformPointCloud(ptTarget, ptTargetNew, settings.g_fTx, settings.g_fTy, settings.g_fSx, settings.g_fSy);
-    for (int i = 0; i < ptTargetNew.size(); ++i)
+    transformPointCloud(*targetPtr, target_tmp, settings.g_fTx, settings.g_fTy, settings.g_fSx, settings.g_fSy);
+    for (int i = 0; i < target_tmp.size(); ++i)
     {
-      cv::circle(imgMerged, cv::Point(ptTargetNew.at(i).x, ptTargetNew.at(i).y),
+      cv::circle(imgMerged, cv::Point(target_tmp.at(i).x, target_tmp.at(i).y),
                  3, cv::Scalar(0, 255, 255), -1);
     }
 
     cv::imshow("Merge", imgMerged);
     char szKey = cv::waitKey(10);
-    // stop when press space
+    // stop when escape is pressed
     if (27 == szKey)
       break;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    pcl::registration::CorrespondenceEstimation<pcl::PointXY, pcl::PointXY> est;
+    pcl::Correspondences all_correspondences;
 
     // ... read or fill in source and target
     est.setInputCloud(sourcePtr);
@@ -568,12 +580,12 @@ int main(int argc, char **argv)
     // Optimize the transformation based on current correspondences
     if (settings.g_bDoCmaes == true)
     {
-      doCMAES(settings.g_fTx, settings.g_fTy, (settings.g_fSx - 1.0) * 100.0, (settings.g_fSy - 1.0) * 100.0, config);
+      doCMAES(sourcePtr, targetPtr, settings.g_fTx, settings.g_fTy, (settings.g_fSx - 1.0) * 100.0, (settings.g_fSy - 1.0) * 100.0, config);
       settings.g_bDoCmaes = false;
 
       // Output the new correspondences
       std::ofstream oo;
-      oo.open(config.output_prefix);
+      oo.open(config.output_prefix + "_mapping.txt");
       est.setInputCloud(sourcePtr);
       est.setInputTarget(targetPtr);
 
@@ -596,10 +608,10 @@ int main(int argc, char **argv)
       for (int i = 0; i < all_correspondences.size(); ++i)
       {
         pcl::PointXY pntSource;
-        pntSource = ptSource.points.at(all_correspondences.at(i).index_query);
+        pntSource = sourcePtr->points.at(all_correspondences.at(i).index_query);
         pcl::PointXY pntTargetNew;
         pntTargetNew =
-            ptTargetNew.points.at(all_correspondences.at(i).index_match);
+            target_tmp.points.at(all_correspondences.at(i).index_match);
         // ooAll<<all_correspondences.at(i).index_query<<" "<< pntSource.x/0.2<<
         // " " << pntSource.y/0.2 << " "  <<
         // all_correspondences.at(i).index_match << " " << pntTargetNew.x/0.2 <<
