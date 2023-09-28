@@ -420,7 +420,7 @@ void print_version_info(std::ostream &stream, const std::string &line_prefix = "
   {
     stream << line_prefix << "GIT Branch:" << git::Branch() << std::endl;
     stream << line_prefix << "GIT Commit:" << git::CommitSHA1() << std::endl;
-    stream << line_prefix << "GIT Has uncommitted changes:" << git::AnyUncommittedChanges() << std::endl;
+    stream << line_prefix << "GIT Has uncommitted changes:" << (git::AnyUncommittedChanges() ? "yes" : "no") << std::endl;
     stream << line_prefix << "GIT Commit date:" << git::CommitDate() << std::endl;
   }
 }
