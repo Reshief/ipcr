@@ -465,6 +465,9 @@ int main(int argc, char **argv)
 
     // Make input and output positional arguments
     options.parse_positional({"input_before", "input_after", "output_prefix"});
+
+    options.positional_help("<input_before> <input_after> <output_prefix>");
+    options.show_positional_help();
   }
   catch (const cxxopts::exceptions::specification &e)
   {
