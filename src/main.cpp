@@ -155,6 +155,10 @@ bool readConfigFile(const std::string config_file_pathName, Configuration &confi
 // Mouse control
 void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
 {
+
+  // TODO: Fix issue with translation and redrawing. Probably need to rescale the translate offset in mouse callback
+  // FIX: Still issue with scale of translation and scaling based on the mouse callback
+
   // Current and previous mouse pointer positions for distance calculations
   cv::Vec2f pntCur, pntBegin;
   if (event == cv::EVENT_LBUTTONDOWN)
