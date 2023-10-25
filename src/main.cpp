@@ -19,6 +19,9 @@ typedef pcl::PointCloud<pcl::PointXY> PCl2D;
 // Shared pointer to a 2d pointcloud
 typedef PCl2D::Ptr PClPtr;
 
+const cv::Scalar before_color = cv::Scalar(255, 100, 0);
+const cv::Scalar after_color = cv::Scalar(0, 255, 255);
+
 // Runtime-modified settings of the program
 struct Settings
 {
@@ -66,8 +69,12 @@ struct Configuration
 // Global setting object
 Settings settings;
 
+const size_t img_size_x = 1024;
+const size_t img_size_y = 1024;
+
 // Rendering targets for the output of the program
-cv::Mat imgFixed = cv::Mat::zeros(1024, 1024, CV_8UC3);
+cv::Mat imgFixed = cv::Mat::zeros(img_size_x, img_size_y, CV_8UC3);
+pcl::PointXY min_plot, max_plot;
 
 // String keys for finding the options in the configuration file.
 const std::string config_key_xscale_minimum = "stretch_x_min";
@@ -243,12 +250,19 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, float trans
 
   cv::Mat imgMerged = imgFixed.clone();
 
+  float plot_range_x = max_plot.x - min_plot.x;
+  float plot_range_y = max_plot.y - min_plot.y;
+
   PCl2D target_New;
+
   transformPointCloud(*targetPtr, target_New, translate_x, translate_y, stretch_x, stretch_y, shear_x, shear_y);
   for (int i = 0; i < target_New.size(); ++i)
   {
-    cv::circle(imgMerged, cv::Point(target_New.at(i).x, target_New.at(i).y),
-               3, cv::Scalar(0, 255, 255), -1);
+    cv::circle(imgMerged,
+               cv::Point(
+                   (target_New.at(i).x - min_plot.x) / plot_range_x * img_size_x,
+                   (target_New.at(i).y - min_plot.y) / plot_range_y * img_size_y),
+               3, after_color, -1);
   }
 
   pcl::registration::CorrespondenceEstimation<pcl::PointXY, pcl::PointXY> est;
@@ -600,38 +614,101 @@ int main(int argc, char **argv)
   PClPtr sourcePtr = std::make_shared<PCl2D>();
   PClPtr targetPtr = std::make_shared<PCl2D>();
 
-  float x, y;
-  // read and plot the srouce point cloud
-  while (infileSrc >> x >> y)
-  {
-    // x *= 0.2;
-    // y *= 0.2;
-    x *= config.g_f_loadtime_scaling;
-    y *= config.g_f_loadtime_scaling;
-    pcl::PointXY pnt;
-    pnt.x = x;
-    pnt.y = y;
+  size_t before_count = 0;
+  pcl::PointXY before_avg{};
 
+  size_t after_count = 0;
+  pcl::PointXY after_avg{};
+
+  std::vector<pcl::PointXY> before_points;
+  std::vector<pcl::PointXY> after_points;
+
+  pcl::PointXY input_point{};
+  // read and plot the srouce point cloud
+  while (infileSrc >> input_point.x >> input_point.y)
+  {
+    before_points.push_back(input_point);
+    before_avg.x += input_point.x;
+    before_avg.y += input_point.y;
+  }
+  before_count = before_points.size();
+
+  before_avg.x /= float(before_count);
+  before_avg.y /= float(before_count);
+
+  while (infileTar >> input_point.x >> input_point.y)
+  {
+    after_points.push_back(input_point);
+    after_avg.x += input_point.x;
+    after_avg.y += input_point.y;
+  }
+  after_count = after_points.size();
+
+  after_avg.x /= float(before_count);
+  after_avg.y /= float(before_count);
+
+  pcl::PointXY max_pos(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max()), min_pos(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+
+  // Normalize COM position and find outer bounds of all points
+  for (pcl::PointXY &point : before_points)
+  {
+    point.x -= before_avg.x;
+    point.y -= before_avg.y;
+
+    max_pos.x = std::max(max_pos.x, point.x);
+    max_pos.y = std::max(max_pos.y, point.y);
+
+    min_pos.x = std::min(min_pos.x, point.x);
+    min_pos.y = std::min(min_pos.y, point.y);
+  }
+
+  for (pcl::PointXY &point : after_points)
+  {
+    point.x -= after_avg.x;
+    point.y -= after_avg.y;
+
+    max_pos.x = std::max(max_pos.x, point.x);
+    max_pos.y = std::max(max_pos.y, point.y);
+
+    min_pos.x = std::min(min_pos.x, point.x);
+    min_pos.y = std::min(min_pos.y, point.y);
+  }
+
+  float range_x = max_pos.x - min_pos.x;
+  float range_y = max_pos.y - min_pos.y;
+
+  min_plot = pcl::PointXY(min_pos.x - range_x * 0.2, min_pos.y - range_y * 0.2);
+  max_plot = pcl::PointXY(max_pos.x + range_x * 0.2, max_pos.y + range_y * 0.2);
+
+  float plot_range_x = max_plot.x - min_plot.x;
+  float plot_range_y = max_plot.y - min_plot.y;
+
+  // Plot points and transorm into common
+  for (pcl::PointXY &point : before_points)
+  {
     // Plot the points as rectangles on the screen
     // cv::circle(imgFixed, cv::Point(x,y), 3, cv::Scalar(0,255,0),-1); //1
-    cv::rectangle(imgFixed, cv::Point(x - 2, y - 2), cv::Point(x + 2, y + 2),
-                  cv::Scalar(255, 100, 0), -1);
-    sourcePtr->push_back(pnt);
+    cv::rectangle(imgFixed,
+                  cv::Point(
+                      (point.x - min_plot.x) / plot_range_x * img_size_x - 2,
+                      (point.y - min_plot.y) / plot_range_y * img_size_y - 2),
+                  cv::Point(
+                      (point.x - min_plot.x) / plot_range_x * img_size_x + 2,
+                      (point.y - min_plot.y) / plot_range_y * img_size_y + 2),
+                  before_color, -1);
+    sourcePtr->push_back(point);
   }
   cv::Mat imgMerged = imgFixed.clone();
 
   // read and plot the target point cloud
-  while (infileTar >> x >> y)
+  for (pcl::PointXY &point : after_points)
   {
-    // x *= 0.2;
-    // y *= 0.2;
-    x *= config.g_f_loadtime_scaling;
-    y *= config.g_f_loadtime_scaling;
-    pcl::PointXY pnt;
-    pnt.x = x;
-    pnt.y = y;
-    targetPtr->push_back(pnt);
-    cv::circle(imgMerged, cv::Point(x, y), 3, cv::Scalar(0, 255, 255), -1);
+    cv::circle(imgMerged,
+               cv::Point(
+                   (point.x - min_plot.x) / plot_range_x * img_size_x,
+                   (point.y - min_plot.y) / plot_range_y * img_size_y),
+               3, after_color, -1);
+    targetPtr->push_back(point);
   }
 
   std::cout << "Press 'ESC' to quit" << std::endl;
@@ -643,8 +720,11 @@ int main(int argc, char **argv)
     transformPointCloud(*targetPtr, target_tmp, settings.g_f_translate_x, settings.g_f_translate_y, settings.g_f_stretch_x, settings.g_f_stretch_y, settings.g_f_shear_x, settings.g_f_shear_y);
     for (int i = 0; i < target_tmp.size(); ++i)
     {
-      cv::circle(imgMerged, cv::Point(target_tmp.at(i).x, target_tmp.at(i).y),
-                 3, cv::Scalar(0, 255, 255), -1);
+      cv::circle(imgMerged,
+                 cv::Point(
+                     (target_tmp.at(i).x - min_plot.x) / plot_range_x * img_size_x,
+                     (target_tmp.at(i).y - min_plot.y) / plot_range_y * img_size_y),
+                 3, after_color, -1);
     }
 
     cv::imshow("Merge", imgMerged);
