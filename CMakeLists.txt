@@ -1,8 +1,14 @@
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
-if (POLICY CMP0048)
-    cmake_policy(SET CMP0048 NEW)
-endif (POLICY CMP0048)
+IF(COMMAND CMAKE_POLICY) 
+	if (POLICY CMP0048)
+		cmake_policy(SET CMP0048 NEW)
+	endif (POLICY CMP0048)
+
+	if (POLICY CMP0071)
+		cmake_policy(SET CMP0071 NEW)
+	endif (POLICY CMP0071)
+endif (COMMAND CMAKE_POLICY) 
 
 if(WIN32)
 #	set(CMAKE_TOOLCHAIN_FILE ${VCPKG_PATH}/scripts/buildsystems/vcpkg.cmake)
@@ -79,6 +85,7 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 add_executable (iterative_closest_point ${SOURCES})
+set_property(TARGET iterative_closest_point PROPERTY CXX_STANDARD 20)
 target_include_directories(iterative_closest_point PUBLIC ${OpenCV_INCLUDE_DIRS} PUBLIC ${PCL_INCLUDE_DIRS})
 target_link_libraries (iterative_closest_point PRIVATE ${OpenCV_LIBS} cxxopts::cxxopts)
 target_link_libraries (iterative_closest_point PRIVATE ${PCL_LIBRARIES} )
