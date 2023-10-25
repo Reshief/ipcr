@@ -87,6 +87,10 @@ const std::string config_key_yshear_minimum = "shear_y_min";
 const std::string config_key_yshear_maximum = "shear_y_max";
 const std::string config_key_scaling_factor = "loadtime_scaling";
 
+
+// Mouse control reference points
+cv::Vec2f mouse_control_point_beginf;
+
 // Read configuration file
 bool readConfigFile(const std::string config_file_pathName, Configuration &config)
 {
@@ -160,14 +164,14 @@ void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
   // FIX: Still issue with scale of translation and scaling based on the mouse callback
 
   // Current and previous mouse pointer positions for distance calculations
-  cv::Vec2f pntCur, pntBegin;
+  cv::Vec2f pntCur;
   if (event == cv::EVENT_LBUTTONDOWN)
   {
     settings.g_bEventLButtonDown = true;
     pntCur[0] = x;
     pntCur[1] = y;
-    pntBegin[0] = x;
-    pntBegin[1] = y;
+    mouse_control_point_beginf[0] = x;
+    mouse_control_point_beginf[1] = y;
   }
   else if (event == cv::EVENT_LBUTTONUP)
   {
@@ -178,8 +182,8 @@ void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
     settings.g_bEventRButtonDown = true;
     pntCur[0] = x;
     pntCur[1] = y;
-    pntBegin[0] = x;
-    pntBegin[1] = y;
+    mouse_control_point_beginf[0] = x;
+    mouse_control_point_beginf[1] = y;
   }
   else if (event == cv::EVENT_RBUTTONUP)
   {
@@ -191,14 +195,16 @@ void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
     pntCur[1] = y;
     if (settings.g_bEventLButtonDown == true)
     {
-      settings.g_f_translate_x = pntCur[0] - pntBegin[0];
-      settings.g_f_translate_y = pntCur[1] - pntBegin[1];
+      float plot_range_x = max_plot.x - min_plot.x;
+      float plot_range_y = max_plot.y - min_plot.y;
+      settings.g_f_translate_x = (pntCur[0] - mouse_control_point_beginf[0]) / img_size_x * plot_range_x;
+      settings.g_f_translate_y = (pntCur[1] - mouse_control_point_beginf[1]) / img_size_y * plot_range_y;
     }
 
     if (settings.g_bEventRButtonDown == true)
     {
-      settings.g_f_stretch_x = settings.g_f_stretch_x + (pntCur[0] - pntBegin[0]) * 0.001;
-      settings.g_f_stretch_y = settings.g_f_stretch_y + (pntCur[1] - pntBegin[1]) * 0.001;
+      settings.g_f_stretch_x = settings.g_f_stretch_x + (pntCur[0] - mouse_control_point_beginf[0]) * 0.001;
+      settings.g_f_stretch_y = settings.g_f_stretch_y + (pntCur[1] - mouse_control_point_beginf[1]) * 0.001;
     }
   }
   else if (event == cv::EVENT_LBUTTONDBLCLK)
@@ -636,6 +642,7 @@ int main(int argc, char **argv)
     before_avg.y += input_point.y;
   }
   before_count = before_points.size();
+  std::vector<pcl::PointXY> before_points_unnormalized(before_points);
 
   before_avg.x /= float(before_count);
   before_avg.y /= float(before_count);
@@ -647,6 +654,7 @@ int main(int argc, char **argv)
     after_avg.y += input_point.y;
   }
   after_count = after_points.size();
+  std::vector<pcl::PointXY> after_points_unnormalized(after_points);
 
   after_avg.x /= float(before_count);
   after_avg.y /= float(before_count);
@@ -755,7 +763,8 @@ int main(int argc, char **argv)
     }
     err /= all_correspondences.size() + 1;
 
-    std::cout << all_correspondences.size() << "	" << err << "\n";
+    // TODO: Disabled for now
+    // std::cout << all_correspondences.size() << "	" << err << "\n";
 
     // Optimize the transformation based on current correspondences
     if (settings.g_bDoCmaes == true)
