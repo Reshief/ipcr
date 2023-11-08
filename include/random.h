@@ -67,7 +67,7 @@ public:
       x2 = 2.0*uniform() - 1.0;
       rquad = x1*x1 + x2*x2;
     } while(rquad >= 1 || rquad <= 0);
-    const register T fac = std::sqrt(T(-2)*std::log(rquad)/rquad);
+    const T fac = std::sqrt(T(-2)*std::log(rquad)/rquad);
     hold = fac*x1;
     return fac*x2;
   }

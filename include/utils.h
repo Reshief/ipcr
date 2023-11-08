@@ -43,15 +43,15 @@ int minIndex(const T* rgd, int len)
 template<typename T>
 T myhypot(T a, T b)
 {
-  const register T fabsa = std::fabs(a), fabsb = std::fabs(b);
+  const T fabsa = std::fabs(a), fabsb = std::fabs(b);
   if(fabsa > fabsb)
   {
-    const register T r = b / a;
+    const  T r = b / a;
     return fabsa*std::sqrt(T(1)+r*r);
   }
   else if(b != T(0))
   {
-    const register T r = a / b;
+    const T r = a / b;
     return fabsb*std::sqrt(T(1)+r*r);
   }
   else
