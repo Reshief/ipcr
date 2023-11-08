@@ -1,0 +1,11 @@
+stretch_x_min	0.99
+stretch_x_max	1.01
+stretch_y_min	0.99
+stretch_y_max	1.01
+
+shear_x_min     0.0
+shear_x_max     0.1
+shear_y_min     -0.001
+shear_y_max     0.001
+
+loadtime_scaling 1.00

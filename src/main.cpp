@@ -87,7 +87,6 @@ const std::string config_key_yshear_minimum = "shear_y_min";
 const std::string config_key_yshear_maximum = "shear_y_max";
 const std::string config_key_scaling_factor = "loadtime_scaling";
 
-
 // Mouse control reference points
 cv::Vec2f mouse_control_point_beginf;
 
@@ -574,7 +573,8 @@ int main(int argc, char **argv)
       config.config_file_path = result["config_file"].as<std::string>();
       if (config.config_file_path.empty())
       {
-        config.config_file_path = "./conf/Config.ini";
+        config.config_file_path = "./conf/config.txt";
+        std::cerr << "No config file provided, defaulting to: " << config.config_file_path << std::endl;
       }
     }
     else
