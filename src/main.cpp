@@ -21,6 +21,10 @@ typedef PCl2D::Ptr PClPtr;
 
 const cv::Scalar before_color = cv::Scalar(255, 100, 0);
 const cv::Scalar after_color = cv::Scalar(0, 255, 255);
+const cv::Scalar lowlight_color = cv::Scalar(100, 100, 100);
+const cv::Scalar highlight_color = cv::Scalar(0, 0, 255);
+const cv::Scalar selected_before_color = cv::Scalar(255, 255, 0);
+const cv::Scalar selected_after_color = cv::Scalar(0, 255, 100);
 
 // Runtime-modified settings of the program
 struct Settings
@@ -37,6 +41,45 @@ struct Settings
   bool g_bEventRButtonDown;
   // Flag to perform point cloud optimization
   bool g_bDoCmaes;
+
+  // Keep track of potential mapping information
+  bool has_matching = false;
+  int64_t match_index_before = -1;
+  int64_t match_index_after = -1;
+  // Reference points for before and after configurations
+  struct
+  {
+    float x, y;
+  } ref_before;
+  struct
+  {
+    float x, y;
+  } ref_after;
+};
+
+struct TransformSettings
+{
+  // Current streching settings
+  struct
+  {
+    float x, y;
+  } stretch;
+
+  // Current shear settings
+  struct
+  {
+    float x, y;
+  } shear;
+
+  // Specify two points in the before and after clouds that should correspond
+  struct
+  {
+    float x, y;
+  } target_before;
+  struct
+  {
+    float x, y;
+  } target_after;
 };
 
 // Configuration options loaded at start
@@ -73,7 +116,7 @@ const size_t img_size_x = 1024;
 const size_t img_size_y = 1024;
 
 // Rendering targets for the output of the program
-cv::Mat imgFixed = cv::Mat::zeros(img_size_x, img_size_y, CV_8UC3);
+cv::Mat imgFixed;
 pcl::PointXY min_plot, max_plot;
 
 // String keys for finding the options in the configuration file.
@@ -89,6 +132,13 @@ const std::string config_key_scaling_factor = "loadtime_scaling";
 
 // Mouse control reference points
 cv::Vec2f mouse_control_point_beginf;
+
+// Deal with selecting corresponding cells
+bool isSelectMode = false;
+int currSelectStep = 0;
+std::vector<int> indices(2, -1);
+std::vector<pcl::PointXY> image_space_pos_before;
+std::vector<pcl::PointXY> image_space_pos_after;
 
 // Read configuration file
 bool readConfigFile(const std::string config_file_pathName, Configuration &config)
@@ -158,7 +208,6 @@ bool readConfigFile(const std::string config_file_pathName, Configuration &confi
 // Mouse control
 void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
 {
-
   // TODO: Fix issue with translation and redrawing. Probably need to rescale the translate offset in mouse callback
   // FIX: Still issue with scale of translation and scaling based on the mouse callback
 
@@ -212,31 +261,84 @@ void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
   }
 }
 
+int find_closest_match(const std::vector<pcl::PointXY> &ref, const pcl::PointXY &chosen)
+{
+  float min_dist_sq = std::numeric_limits<float>::max();
+  int chosen_index = -1;
+  for (int i = 0; i < ref.size(); i++)
+  {
+    float dx = (ref[i].x - chosen.x);
+    float dy = (ref[i].y - chosen.y);
+    float curr_dist_sq = dx * dx + dy * dy;
+
+    if (curr_dist_sq < min_dist_sq)
+    {
+      chosen_index = i;
+      min_dist_sq = curr_dist_sq;
+    }
+  }
+  return chosen_index;
+}
+
+// Mouse control for mapping selection
+void MouseCallbackFuncMapping(int event, int x, int y, int flags, void *userdata)
+{
+  pcl::PointXY pntCur;
+  if (event == cv::EVENT_LBUTTONUP)
+  {
+    pntCur.x = x;
+    pntCur.y = y;
+
+    if (currSelectStep == 0)
+    {
+      indices[currSelectStep] = find_closest_match(image_space_pos_before, pntCur);
+      std::cerr << "Before index:" << indices[currSelectStep] << std::endl;
+      currSelectStep++;
+    }
+    else if (currSelectStep == 1)
+    {
+      indices[currSelectStep] = find_closest_match(image_space_pos_after, pntCur);
+      std::cerr << "After index:" << indices[currSelectStep] << std::endl;
+      currSelectStep++;
+    }
+  }
+}
+
 // Transformation calculation
 void transformPointCloud(const PCl2D &pcIn, PCl2D &pcOut,
-                         float translate_x, float translate_y,
-                         float stretch_x, float stretch_y,
-                         float shear_x, float shear_y)
+                         const TransformSettings &trans_settings)
 {
-  cv::Mat matTransfo = cv::Mat::eye(3, 3, CV_32F);
+  // Implements the shear and stretch steps
+  cv::Mat shear_stretch = cv::Mat::eye(3, 3, CV_32F);
+
+  // Shifts the after image to a common reference frame
+  cv::Mat shift_after_to_common = cv::Mat::eye(3, 3, CV_32F);
+  // Shifts the common reference frame into the before image frame
+  cv::Mat shift_common_to_before = cv::Mat::eye(3, 3, CV_32F);
   // configure shear
-  matTransfo.at<float>(0, 1) += shear_x;
-  matTransfo.at<float>(1, 0) += shear_y;
-  matTransfo.at<float>(0, 0) += shear_y * shear_x;
+  shear_stretch.at<float>(0, 1) += trans_settings.shear.x;
+  shear_stretch.at<float>(1, 0) += trans_settings.shear.y;
+  shear_stretch.at<float>(0, 0) += trans_settings.shear.y * trans_settings.shear.x;
 
   // configure stretch
-  matTransfo.at<float>(0, 0) *= stretch_x;
-  matTransfo.at<float>(1, 0) *= stretch_x;
+  shear_stretch.at<float>(0, 0) *= trans_settings.stretch.x;
+  shear_stretch.at<float>(1, 0) *= trans_settings.stretch.y;
 
-  matTransfo.at<float>(0, 1) *= stretch_y;
-  matTransfo.at<float>(1, 1) *= stretch_y;
+  shear_stretch.at<float>(0, 1) *= trans_settings.stretch.y;
+  shear_stretch.at<float>(1, 1) *= trans_settings.stretch.y;
 
-  // configure displacement
-  matTransfo.at<float>(0, 2) = translate_x;
-  matTransfo.at<float>(1, 2) = translate_y;
+  // configure displacement steps
+  shift_after_to_common.at<float>(0, 2) = -trans_settings.target_after.x;
+  shift_after_to_common.at<float>(1, 2) = -trans_settings.target_after.y;
+
+  shift_common_to_before.at<float>(0, 2) = trans_settings.target_before.x;
+  shift_common_to_before.at<float>(1, 2) = trans_settings.target_before.y;
+
+  cv::Mat combined_transformation = shift_common_to_before * shear_stretch * shift_after_to_common;
 
   cv::Mat pntIn = cv::Mat::ones(3, 1, CV_32F);
   cv::Mat pntOut;
+
   pcOut.resize(pcIn.size());
   for (int i = 0; i < pcIn.size(); ++i)
   {
@@ -244,17 +346,17 @@ void transformPointCloud(const PCl2D &pcIn, PCl2D &pcOut,
     pntIn.at<float>(1, 0) = pcIn.at(i).y;
     pntIn.at<float>(2, 0) = 1.0;
 
-    pntOut = matTransfo * pntIn;
+    pntOut = combined_transformation * pntIn;
     pcOut.at(i).x = pntOut.at<float>(0, 0) / pntOut.at<float>(2, 0);
     pcOut.at(i).y = pntOut.at<float>(1, 0) / pntOut.at<float>(2, 0);
   }
 }
 
 // Calculation of cost function, tx,ty: translation; sx, sy: scaling
-float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, float translate_x, float translate_y, float stretch_x, float stretch_y, float shear_x, float shear_y, const Configuration &config)
+float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, const TransformSettings &trans_settings, const Configuration &config)
 {
-  // Range limitation. Output infinite cost if cell outside of range of scales
-  if (stretch_x < config.g_f_stretch_x_min || stretch_x > config.g_f_stretch_x_max || stretch_y < config.g_f_stretch_y_min || stretch_y > config.g_f_stretch_y_max || shear_x < config.g_f_shear_x_min || shear_x > config.g_f_shear_x_max || shear_y < config.g_f_shear_y_min || shear_y > config.g_f_shear_y_max)
+  // Range limitation. Output infinite cost if transformation outside of range of scales
+  if (trans_settings.stretch.x < config.g_f_stretch_x_min || trans_settings.stretch.x > config.g_f_stretch_x_max || trans_settings.stretch.y < config.g_f_stretch_y_min || trans_settings.stretch.y > config.g_f_stretch_y_max || trans_settings.shear.x < config.g_f_shear_x_min || trans_settings.shear.x > config.g_f_shear_x_max || trans_settings.shear.y < config.g_f_shear_y_min || trans_settings.shear.y > config.g_f_shear_y_max)
     return FLT_MAX;
 
   cv::Mat imgMerged = imgFixed.clone();
@@ -264,7 +366,7 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, float trans
 
   PCl2D target_New;
 
-  transformPointCloud(*targetPtr, target_New, translate_x, translate_y, stretch_x, stretch_y, shear_x, shear_y);
+  transformPointCloud(*targetPtr, target_New, trans_settings);
   for (int i = 0; i < target_New.size(); ++i)
   {
     cv::circle(imgMerged,
@@ -301,7 +403,7 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, float trans
 }
 
 // CMA-ES optimization
-void doCMAES(const PClPtr &source, const PClPtr &target, float translate_x, float translate_y, float stretch_x, float stretch_y, float shear_x, float shear_y, const Configuration &config)
+void doCMAES(const PClPtr &source, const PClPtr &target, const Settings &trafo_settings, const Configuration &config)
 {
   CMAES<float> evo;  // the optimizer
   float *const *pop; // sampled population
@@ -319,38 +421,30 @@ void doCMAES(const PClPtr &source, const PClPtr &target, float translate_x, floa
           and as value read from signals.par by calling evo.readSignals
           explicitely.
     */
-  const int dim = 6;
+  const int dim = 4;
   float xstart[dim];
-  xstart[0] = translate_x;
-  xstart[1] = translate_y;
-  xstart[2] = stretch_x;
-  xstart[3] = stretch_y;
-  xstart[4] = shear_x;
-  xstart[5] = shear_y;
+  xstart[0] = (trafo_settings.g_f_stretch_x - 1.) * 100;
+  xstart[1] = (trafo_settings.g_f_stretch_y - 1.) * 100;
+  xstart[2] = trafo_settings.g_f_shear_x * 100;
+  xstart[3] = trafo_settings.g_f_shear_y * 100;
 
   float lb[dim];
-  lb[0] = xstart[0] - 20;
-  lb[1] = xstart[1] - 20;
-  lb[2] = (config.g_f_stretch_x_min - 1.) * 100;
-  lb[3] = (config.g_f_stretch_y_min - 1.) * 100;
-  lb[4] = (config.g_f_shear_x_min) * 100;
-  lb[5] = (config.g_f_shear_y_min) * 100;
+  lb[0] = (config.g_f_stretch_x_min - 1.) * 100;
+  lb[1] = (config.g_f_stretch_y_min - 1.) * 100;
+  lb[2] = (config.g_f_shear_x_min) * 100;
+  lb[3] = (config.g_f_shear_y_min) * 100;
 
   float ub[dim];
-  ub[0] = xstart[0] + 20;
-  ub[1] = xstart[1] + 20;
-  ub[2] = (config.g_f_stretch_y_max - 1.) * 100;
-  ub[3] = (config.g_f_stretch_y_max - 1.) * 100;
-  ub[4] = (config.g_f_shear_x_max) * 100;
-  ub[5] = (config.g_f_shear_y_max) * 100;
+  ub[0] = (config.g_f_stretch_y_max - 1.) * 100;
+  ub[1] = (config.g_f_stretch_y_max - 1.) * 100;
+  ub[2] = (config.g_f_shear_x_max) * 100;
+  ub[3] = (config.g_f_shear_y_max) * 100;
 
   float stddev[dim];
-  stddev[0] = 2;
-  stddev[1] = 2;
+  stddev[0] = std::min(5., (ub[0] - lb[0]) / 3.);
+  stddev[1] = std::min(5., (ub[1] - lb[1]) / 3.);
   stddev[2] = std::min(5., (ub[2] - lb[2]) / 3.);
   stddev[3] = std::min(5., (ub[3] - lb[3]) / 3.);
-  stddev[4] = std::min(5., (ub[4] - lb[4]) / 3.);
-  stddev[5] = std::min(5., (ub[5] - lb[5]) / 3.);
 
   Parameters<float> parameters;
   // You can resume a previous run by specifying a file that contains the
@@ -398,8 +492,21 @@ void doCMAES(const PClPtr &source, const PClPtr &target, float translate_x, floa
       /* while (!is_feasible(pop[i]))
                 evo.reSampleSingle(i);
       */
-      fitvals[i] = costFunction(source, target, pop[i][0], pop[i][1], 1.0 + pop[i][2] * 0.01,
-                                1.0 + pop[i][3] * 0.01, pop[i][4] * 0.01, pop[i][5] * 0.01, config);
+      TransformSettings transform_settings{};
+
+      if (trafo_settings.has_matching)
+      {
+        transform_settings.target_before.x = source->at(trafo_settings.match_index_before).x;
+        transform_settings.target_before.y = source->at(trafo_settings.match_index_before).y;
+        transform_settings.target_after.x = target->at(trafo_settings.match_index_after).x;
+        transform_settings.target_after.y = target->at(trafo_settings.match_index_after).y;
+      }
+      transform_settings.stretch.x = 1.0 + pop[i][0] * 0.01;
+      transform_settings.stretch.y = 1.0 + pop[i][1] * 0.01;
+      transform_settings.shear.x = pop[i][2] * 0.01;
+      transform_settings.shear.y = pop[i][3] * 0.01;
+
+      fitvals[i] = costFunction(source, target, transform_settings, config);
     }
     // update search distribution
     evo.updateDistribution(fitvals);
@@ -445,6 +552,100 @@ void print_version_info(std::ostream &stream, const std::string &line_prefix = "
     stream << line_prefix << "GIT Commit:" << git::CommitSHA1() << std::endl;
     stream << line_prefix << "GIT Has uncommitted changes:" << (git::AnyUncommittedChanges() ? "yes" : "no") << std::endl;
     stream << line_prefix << "GIT Commit date:" << git::CommitDate() << std::endl;
+  }
+}
+
+std::vector<pcl::PointXY> to_image_space(const PClPtr &cloudptr, const Settings &image_settings)
+{
+  std::vector<pcl::PointXY> res(cloudptr->size());
+  float plot_range_x = max_plot.x - min_plot.x;
+  float plot_range_y = max_plot.y - min_plot.y;
+
+  for (size_t i = 0; i < cloudptr->size(); i++)
+  {
+    // Plot the points as rectangles on the screen
+    // cv::circle(imgFixed, cv::Point(x,y), 3, cv::Scalar(0,255,0),-1); //1
+    res[i].x = (cloudptr->at(i).x - min_plot.x) / plot_range_x * img_size_x;
+    res[i].y = (cloudptr->at(i).y - min_plot.y) / plot_range_y * img_size_y;
+  }
+
+  return res;
+}
+
+void input_mapping(const PClPtr &source, const PClPtr &target, Settings &map_settings)
+{
+  isSelectMode = true;
+  currSelectStep = 0;
+
+  indices.assign(2, -1);
+
+  image_space_pos_before = to_image_space(source, map_settings);
+  image_space_pos_after = to_image_space(target, map_settings);
+
+  cv::namedWindow("Mapping");
+  cv::setMouseCallback("Mapping", MouseCallbackFuncMapping, NULL);
+
+  cv::Scalar colors[2][2] = {{highlight_color, lowlight_color}, {lowlight_color, highlight_color}};
+
+  while (currSelectStep < indices.size())
+  {
+    cv::Mat img_mapping = cv::Mat::zeros(img_size_x, img_size_y, CV_8UC3);
+
+    // Plot before and after images
+    for (size_t i = 0; i < image_space_pos_before.size(); i++)
+    {
+      cv::Scalar rendercolor = (currSelectStep > 0 ? (i == indices[0] ? selected_before_color : colors[currSelectStep][0]) : colors[currSelectStep][0]);
+      cv::rectangle(img_mapping,
+                    cv::Point(
+                        image_space_pos_before[i].x - 2,
+                        image_space_pos_before[i].y - 2),
+                    cv::Point(
+                        image_space_pos_before[i].x + 2,
+                        image_space_pos_before[i].y + 2),
+                    rendercolor, -1);
+    }
+    for (size_t i = 0; i < image_space_pos_before.size(); i++)
+    {
+      cv::circle(img_mapping,
+                 cv::Point(
+                     image_space_pos_after[i].x,
+                     image_space_pos_after[i].y),
+                 3, colors[currSelectStep][1], -1);
+    }
+
+    cv::imshow("Mapping", img_mapping);
+    char szKey = cv::waitKey(100);
+    // stop when escape is pressed
+    if (27 == szKey)
+    {
+      break;
+    }
+    // Check if the window was closed
+    if (!cv::getWindowProperty("Mapping", cv::WND_PROP_VISIBLE))
+    {
+      break;
+    }
+  }
+  isSelectMode = false;
+  image_space_pos_before.clear();
+  image_space_pos_after.clear();
+
+  if (cv::getWindowProperty("Mapping", cv::WND_PROP_VISIBLE))
+  {
+    cv::destroyWindow("Mapping");
+  }
+
+  if (currSelectStep >= 2)
+  {
+    settings.has_matching = true;
+    settings.match_index_before = indices[0];
+    settings.match_index_after = indices[1];
+  }
+  else
+  {
+    settings.has_matching = false;
+    settings.match_index_before = -1;
+    settings.match_index_after = -1;
   }
 }
 
@@ -579,7 +780,7 @@ int main(int argc, char **argv)
     }
     else
     {
-      config.config_file_path = "./conf/Config.ini";
+      config.config_file_path = "./conf/config.txt";
     }
 
     if (result.count("debug"))
@@ -612,8 +813,6 @@ int main(int argc, char **argv)
 
   readConfigFile(config.config_file_path, config);
 
-  cv::namedWindow("Merge");
-  cv::setMouseCallback("Merge", MouseCallBackFunc, NULL);
   std::ifstream infileSrc(config.positions_before_path);
   std::ifstream infileTar(config.positions_after_path);
   // TODO: Fully remove if actually unused
@@ -629,6 +828,8 @@ int main(int argc, char **argv)
 
   size_t after_count = 0;
   pcl::PointXY after_avg{};
+
+  TransformSettings default_transform{};
 
   std::vector<pcl::PointXY> before_points;
   std::vector<pcl::PointXY> after_points;
@@ -686,6 +887,12 @@ int main(int argc, char **argv)
     min_pos.y = std::min(min_pos.y, point.y);
   }
 
+  // The default reference points are the averages normalized to zero
+  default_transform.target_after.x = 0.;
+  default_transform.target_after.y = 0.;
+  default_transform.target_before.x = 0.;
+  default_transform.target_before.y = 0.;
+
   float range_x = max_pos.x - min_pos.x;
   float range_y = max_pos.y - min_pos.y;
 
@@ -695,48 +902,83 @@ int main(int argc, char **argv)
   float plot_range_x = max_plot.x - min_plot.x;
   float plot_range_y = max_plot.y - min_plot.y;
 
-  // Plot points and transorm into common
-  for (pcl::PointXY &point : before_points)
+  // Plot points and transform into common
+  for (int i = 0; i < before_points.size(); i++)
   {
-    // Plot the points as rectangles on the screen
-    // cv::circle(imgFixed, cv::Point(x,y), 3, cv::Scalar(0,255,0),-1); //1
-    cv::rectangle(imgFixed,
-                  cv::Point(
-                      (point.x - min_plot.x) / plot_range_x * img_size_x - 2,
-                      (point.y - min_plot.y) / plot_range_y * img_size_y - 2),
-                  cv::Point(
-                      (point.x - min_plot.x) / plot_range_x * img_size_x + 2,
-                      (point.y - min_plot.y) / plot_range_y * img_size_y + 2),
-                  before_color, -1);
-    sourcePtr->push_back(point);
+    pcl::PointXY &point = before_points[i];
   }
-  cv::Mat imgMerged = imgFixed.clone();
 
   // read and plot the target point cloud
-  for (pcl::PointXY &point : after_points)
+  for (int i = 0; i < after_points.size(); i++)
   {
-    cv::circle(imgMerged,
-               cv::Point(
-                   (point.x - min_plot.x) / plot_range_x * img_size_x,
-                   (point.y - min_plot.y) / plot_range_y * img_size_y),
-               3, after_color, -1);
+    pcl::PointXY &point = after_points[i];
     targetPtr->push_back(point);
   }
 
   std::cout << "Press 'ESC' to quit" << std::endl;
 
+  cv::namedWindow("Merge");
+  cv::setMouseCallback("Merge", MouseCallBackFunc, NULL);
   while (true)
   {
     PCl2D target_tmp;
-    imgMerged = imgFixed.clone();
-    transformPointCloud(*targetPtr, target_tmp, settings.g_f_translate_x, settings.g_f_translate_y, settings.g_f_stretch_x, settings.g_f_stretch_y, settings.g_f_shear_x, settings.g_f_shear_y);
-    for (int i = 0; i < target_tmp.size(); ++i)
+
+    imgFixed = cv::Mat::zeros(img_size_x, img_size_y, CV_8UC3);
+
+    // Plot points and transform into common
+    for (int i = 0; i < before_points.size(); i++)
     {
+      pcl::PointXY &point = before_points[i];
+      cv::Scalar rendercolor = (settings.has_matching ? (i == indices[0] ? selected_before_color : before_color) : before_color);
+      // Plot the points as rectangles on the screen
+      // cv::circle(imgFixed, cv::Point(x,y), 3, cv::Scalar(0,255,0),-1); //1
+      cv::rectangle(imgFixed,
+                    cv::Point(
+                        (point.x - min_plot.x) / plot_range_x * img_size_x - 2,
+                        (point.y - min_plot.y) / plot_range_y * img_size_y - 2),
+                    cv::Point(
+                        (point.x - min_plot.x) / plot_range_x * img_size_x + 2,
+                        (point.y - min_plot.y) / plot_range_y * img_size_y + 2),
+                    rendercolor, -1);
+      sourcePtr->push_back(point);
+    }
+
+    if (settings.has_matching)
+    {
+      // Get reference data from array
+      default_transform.target_before.x = sourcePtr->at(settings.match_index_before).x;
+      default_transform.target_before.y = sourcePtr->at(settings.match_index_before).y;
+      default_transform.target_after.x = targetPtr->at(settings.match_index_after).x;
+      default_transform.target_after.y = targetPtr->at(settings.match_index_after).y;
+    }
+    else
+    {
+      // The default reference points are the averages normalized to zero
+      default_transform.target_after.x = 0.;
+      default_transform.target_after.y = 0.;
+      default_transform.target_before.x = 0.;
+      default_transform.target_before.y = 0.;
+    }
+
+    default_transform.shear.x = settings.g_f_shear_x;
+    default_transform.shear.y = settings.g_f_shear_y;
+    default_transform.stretch.x = settings.g_f_stretch_x;
+    default_transform.stretch.y = settings.g_f_stretch_y;
+
+    cv::Mat imgMerged = imgFixed.clone();
+
+    transformPointCloud(*targetPtr, target_tmp, default_transform);
+    // read and plot the target point cloud
+    for (int i = 0; i < after_points.size(); i++)
+    {
+      pcl::PointXY &point = target_tmp.at(i);
+      cv::Scalar rendercolor = (settings.has_matching ? (i == indices[1] ? selected_after_color : after_color) : after_color);
       cv::circle(imgMerged,
                  cv::Point(
-                     (target_tmp.at(i).x - min_plot.x) / plot_range_x * img_size_x,
-                     (target_tmp.at(i).y - min_plot.y) / plot_range_y * img_size_y),
-                 3, after_color, -1);
+                     (point.x - min_plot.x) / plot_range_x * img_size_x,
+                     (point.y - min_plot.y) / plot_range_y * img_size_y),
+                 3, rendercolor, -1);
+      targetPtr->push_back(point);
     }
 
     cv::imshow("Merge", imgMerged);
@@ -744,6 +986,18 @@ int main(int argc, char **argv)
     // stop when escape is pressed
     if (27 == szKey)
       break;
+    else if (szKey == 'm')
+    {
+      cv::destroyWindow("Merge");
+      input_mapping(sourcePtr, targetPtr, settings);
+      cv::namedWindow("Merge");
+      cv::setMouseCallback("Merge", MouseCallBackFunc, NULL);
+    }
+    // Check if the window was closed
+    else if (!cv::getWindowProperty("Merge", cv::WND_PROP_VISIBLE))
+    {
+      break;
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -769,7 +1023,7 @@ int main(int argc, char **argv)
     // Optimize the transformation based on current correspondences
     if (settings.g_bDoCmaes == true)
     {
-      doCMAES(sourcePtr, targetPtr, settings.g_f_translate_x, settings.g_f_translate_y, (settings.g_f_stretch_x - 1.0) * 100.0, (settings.g_f_stretch_y - 1.0) * 100.0, settings.g_f_shear_x * 100.0, settings.g_f_shear_y * 100.0, config);
+      doCMAES(sourcePtr, targetPtr, settings, config);
       settings.g_bDoCmaes = false;
 
       // Output the new correspondences
