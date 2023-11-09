@@ -940,7 +940,6 @@ int main(int argc, char **argv)
                         (point.x - min_plot.x) / plot_range_x * img_size_x + 2,
                         (point.y - min_plot.y) / plot_range_y * img_size_y + 2),
                     rendercolor, -1);
-      sourcePtr->push_back(point);
     }
 
     if (settings.has_matching)
@@ -978,7 +977,6 @@ int main(int argc, char **argv)
                      (point.x - min_plot.x) / plot_range_x * img_size_x,
                      (point.y - min_plot.y) / plot_range_y * img_size_y),
                  3, rendercolor, -1);
-      targetPtr->push_back(point);
     }
 
     cv::imshow("Merge", imgMerged);
