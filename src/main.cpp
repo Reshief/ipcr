@@ -904,6 +904,7 @@ int main(int argc, char **argv)
   for (int i = 0; i < before_points.size(); i++)
   {
     pcl::PointXY &point = before_points[i];
+    sourcePtr->push_back(point);
   }
 
   // read and plot the target point cloud
