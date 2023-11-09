@@ -521,12 +521,10 @@ void doCMAES(const PClPtr &source, const PClPtr &target, const Settings &trafo_s
                             xbestever); // allocates memory if needed
   }
 
-  settings.g_f_translate_x = xbestever[0];
-  settings.g_f_translate_y = xbestever[1];
-  settings.g_f_stretch_x = xbestever[2] * 0.01 + 1.0;
-  settings.g_f_stretch_y = xbestever[3] * 0.01 + 1.0;
-  settings.g_f_shear_x = xbestever[4] * 0.01;
-  settings.g_f_shear_y = xbestever[5] * 0.01;
+  settings.g_f_stretch_x = xbestever[0] * 0.01 + 1.0;
+  settings.g_f_stretch_y = xbestever[1] * 0.01 + 1.0;
+  settings.g_f_shear_x = xbestever[2] * 0.01;
+  settings.g_f_shear_y = xbestever[3] * 0.01;
 
   std::cout << "translate: [" << settings.g_f_translate_x << "|" << settings.g_f_translate_y << "]" << std::endl;
   std::cout << "stretch: [" << settings.g_f_stretch_x << "|" << settings.g_f_stretch_y << "]" << std::endl;
