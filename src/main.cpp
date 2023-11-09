@@ -365,15 +365,15 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, const Trans
   float plot_range_x = max_plot.x - min_plot.x;
   float plot_range_y = max_plot.y - min_plot.y;
 
-  PCl2D target_New;
+  PClPtr target_New = std::make_shared<PCl2D>();
 
-  transformPointCloud(*targetPtr, target_New, trans_settings);
-  for (int i = 0; i < target_New.size(); ++i)
+  transformPointCloud(*targetPtr, *target_New, trans_settings);
+  for (int i = 0; i < target_New->size(); ++i)
   {
     cv::circle(imgMerged,
                cv::Point(
-                   (target_New.at(i).x - min_plot.x) / plot_range_x * img_size_x,
-                   (target_New.at(i).y - min_plot.y) / plot_range_y * img_size_y),
+                   (target_New->at(i).x - min_plot.x) / plot_range_x * img_size_x,
+                   (target_New->at(i).y - min_plot.y) / plot_range_y * img_size_y),
                3, after_color, -1);
   }
 
@@ -384,7 +384,7 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, const Trans
   char szKey = cv::waitKey(10);
 
   est.setInputCloud(sourcePtr);
-  est.setInputTarget(targetPtr);
+  est.setInputTarget(target_New);
 
   // Determine all reciprocal correspondences
   est.determineReciprocalCorrespondences(all_correspondences);
