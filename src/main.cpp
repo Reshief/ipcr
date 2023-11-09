@@ -383,7 +383,6 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, const Trans
   char szKey = cv::waitKey(10);
 
   est.setInputCloud(sourcePtr);
-
   est.setInputTarget(targetPtr);
 
   // Determine all reciprocal correspondences
@@ -398,7 +397,8 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, const Trans
          (float(all_correspondences.size()) / float(sourcePtr->size())) *
          (float(all_correspondences.size()) / float(targetPtr->size()));
   // err/=all_correspondences.size()+1; //not work for large cluster
-  std::cout << all_correspondences.size() << "	" << err << "\n";
+  std::cout << "Cost: Matches=" << all_correspondences.size() << "[b:" << sourcePtr->size() << "|a:" << targetPtr->size() << "]"
+            << "	Error:" << err << "\n";
   return err;
 }
 
