@@ -179,6 +179,9 @@ Tell people where they can go to for help. It can be any combination of an issue
 
 If you have ideas for releases in the future, it is a good idea to list them in the README.
 
+*BUGS*
+- The cost function ignores unmatched points, leading to the matching function attempting to not match points because it lowers the overall error
+
 *PLANNED*
 - Fix issues with security programs detecting configuration as virus
 - Choose two cells in before and after to set as corresponding to perform shearing and stretching relative to
