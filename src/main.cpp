@@ -153,6 +153,7 @@ bool readConfigFile(const std::string config_file_pathName, Configuration &confi
     {
       f >> sKey >> sValue;
       f.ignore();
+      std::cerr << "Debug config: key(" << sKey << ") -> val(" << sValue << ")" << std::endl;
       // Read scaling/stretching config
       if (sKey == config_key_xscale_minimum)
       {
@@ -528,6 +529,8 @@ void doCMAES(const PClPtr &source, const PClPtr &target, const Settings &trafo_s
 
   std::cout << "translate: [" << settings.g_f_translate_x << "|" << settings.g_f_translate_y << "]" << std::endl;
   std::cout << "stretch: [" << settings.g_f_stretch_x << "|" << settings.g_f_stretch_y << "]" << std::endl;
+  std::cout << "shear lim x: " << config.g_f_shear_x_min << "<" << settings.g_f_shear_x << " < " << config.g_f_shear_x_max << std::endl;
+  std::cout << "shear lim y: " << config.g_f_shear_y_min << "<" << settings.g_f_shear_y << " < " << config.g_f_shear_y_max << std::endl;
   std::cout << "shear: [" << settings.g_f_shear_x << "|" << settings.g_f_shear_y << "]" << std::endl;
 }
 
