@@ -12,25 +12,35 @@ As you start the program with a command line invocation like:
 
 a window will open.
 ![Example image of the usual combination of command line and `Merge` window opening up when the program is started](doc/sample_usage_image.PNG)
-In this window, by clicking the left mouse button and dragging the mouse, you can shift the after distribution spatially. By right-clicking and dragging, you can change the scaling. This is kinda fiddly, I would not rely on it.
 
-By double clicking the left mouse button, you will trigger the automatic optimization of the match.
+## Controls
+In this window, by clicking the left mouse button and dragging the mouse, you can shift the after distribution spatially. 
+By right-clicking and dragging, you can change the scaling. This is kinda fiddly, I would not rely on it.
 
-After the fitting is done or generally if you want to close the program, press the `ESC` on the keyboard while in the merge window or press `Ctrl+C` when in the command line window.
+Instead, by pressing the keyboard key `m`, you can get into a cell-matching window. There you can click on a cell in the before and then in the after group to tell the Program to match the two during its optimization attempts.
+Click with the left mouse button on a highlighted (red) cell once to mark the before cell, then click a second time on a highglighted (red) after cell to match them. 
+Afterwards, the matching window will close and you will see the two corresponding cells being put on top of each other and displayed in a different color from the rest.
+
+In the main window, by double clicking the left mouse button, you will trigger the automatic optimization of the colony matching.
+This may run for a while depending on the number of cells in your sets. 
+However, you should be able to see progress or at least slight changes in the plotted after-distribution
+
+After the fitting is done or generally if you want to close the program, press the `ESC` on the keyboard while in the merge window or press `Ctrl+C` when in the command line window to force a program shutdown. 
 If you do the latter, while the fit is still running, the output files may be empty or not fully there. So please consider when it is appropriate to force a shutdown of the program while it is running.
+You can also close the cell window. Sometimes it does not immediately recognize the attempt to close the window due to computations being run. Then please try and close the window again.
 
 Results will be written to `<output_directory>_mapping.txt` (a list of before and after indices) and `<output_directory>_all.txt` a file with the before indices, the before x and y position and the after index with its x and y position.
 
-To run, the program will try to load a configuration file (see section `Configuration` for options.) from the path `./conf/Config.ini` by default, but any path to the configuration file can be provided as option `-c <config_file_path>`.
+To run, the program will try to load a configuration file (see section `Configuration` for options.) from the path `./conf/config.txt` by default, but any path to the configuration file can be provided as option `-c <config_file_path>`.
 
 In this configuration file, minimum and maximum values for the attempted interval of stretch and shear in x and y direction respectively are provided.
 If you only want either stretch or shear to be optimized, choose minimum and maximum values very close to 1.0 for the other paramaters, i.e. `stretch_x_min 0.999` and `stretch_x_max 1.0001` if you do not want the stretch in x direction to be optimized.
 
 ### Examples
 
-If you want to run a match of the files `input1.txt` and `input2.txt` using the configuration at `Config.ini` and write the results to `output/`, then the correct command would be:
+If you want to run a match of the files `input1.txt` and `input2.txt` using the configuration at `config.txt` and write the results to `output/`, then the correct command would be:
 
-`.\iterative_closest_point.exe input1.txt input2.txt output/ -c Config.ini`
+`.\iterative_closest_point.exe input1.txt input2.txt output/ -c config.txt`
 
 or without a custom configuration:
 
@@ -57,10 +67,9 @@ To be able to help you, it would be great, if you could provide the following th
 
 ## Quirks
 
-- After refactoring the code, I realized that the scale factor must be set in the configuration, so I fixed that to be 1.0 if not set.
+- Currently, the _all.txt mapping output has questionable positions for some of the cells. Do not rely on that data, instead use the indices to look up the position in your input files.
 - If no configuration is provided, certain default settings are applied (no scaling, no minimum scale, no maximum scale)
 - I added shearing to the code. If shear or stretching should be disabled, the upper and lower boundary values should be set close to 1.0 so that there is almost no range for a spread in those values.
-- A crash on shutdown of the program was fixed.
 
 ## Dependencies
 
@@ -70,7 +79,6 @@ This code depends on
 - CMake for building (needs to be installed)
 - OpenCV (version 4.8.0)
 - PCL (version PCL-1.13.1)
-- QT, GTK for window output
 - Eigen library (version 3.4.0 for PCL if building it yourself)
 - cxxopts (for command line argument parsing, provided as a submodule)
 
@@ -86,6 +94,7 @@ Then the libraries should be available to cmake.
 
 | Name           | Purpose                                                     |
 | -------------- | ----------------------------------------------------------- |
+| `bin  `        | Output of the compiled program. Not in version control      |
 | `build`        | Build directory if present. Not included in version control |
 | `conf`         | Default configuration file                                  |
 | `doc`          | Documentation of the code, mostly images                    |
@@ -114,6 +123,31 @@ The following key and value pairs are supported:
 | `shear_y_max`      | floating point number (e.g. 0.1)  | Maximxum shear in y direction to be considered                                        |
 | Load time rescale:  |                                   |                                                                                       |
 | `loadtime_scaling` | floating point number (e.g. 1.0)  | Scale factor with which input coordinates are multiplied at time of loading           |
+
+
+## Roadmap
+
+A few aspects of this tool are still being worked on. Here is a list of things having been done
+
+*DONE*
+- Choose two cells in before and after to set as corresponding to perform shearing and stretching relative to
+- Fixed the cost function not actually depending on the transformation. It will now converge and give actual correspondences
+- Fixed issues with security programs detecting configuration as virus
+- Fixed the weird evolutional optimization very much diverging from the correct parameters over time
+
+*BUGS*
+- Issues with the _all.txt output positions.
+
+*PLANNED*
+- Come up with a better control concept
+
+*MAYBE*
+- Draw before and after correspondence with different colors?
+- Draw lines between correspondences
+- Add indices to plot in UI in a debug mode
+
+
+## Below this is just some internal stuff, no need to go through it :)
 
 ## Integrate with your tools
 
@@ -174,26 +208,6 @@ Use examples liberally, and show the expected output if you can. It's helpful to
 ## Support
 
 Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-*DONE*
-- Choose two cells in before and after to set as corresponding to perform shearing and stretching relative to
-- Fixed the cost function not actually depending on the transformation. It will now converge and give actual correspondences
-
-*BUGS*
-- None currently
-
-*PLANNED*
-- Fix issues with security programs detecting configuration as virus
-- Come up with a better control concept
-- Fix the weird evolutional optimization very much diverging from the correct parameters over time
-
-*MAYBE*
-- Draw before and after correspondence with different colors?
--
 
 ## Contributing
 
