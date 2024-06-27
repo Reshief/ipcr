@@ -86,8 +86,8 @@ For building the program it uses CMake, which needs to be installed. To build, a
 
 The library cxxopts is included as a submodule to this repository. To download the necessary files, use `git submodule init` and then `git submodule update`. If this doesn't work, check the current git submodule documentation online for how to download submodules.
 
-Installing these tools proved to be more complex than I had expected. On Windows, I recommend downloading vcpkg, then installing with .\vcpkg.exe install eigen pcl qt5 opencv.
-Afterwards, it needs to be integrated using .\vcpkg.exe integrate install.
+Installing these tools proved to be more complex than I had expected. On Windows, I recommend downloading vcpkg, then installing with `.\vcpkg.exe install eigen3 pcl qt5 opencv`.
+Afterwards, it needs to be integrated using `.\vcpkg.exe integrate install`.
 Then the libraries should be available to cmake.
 
 ## Directories
