@@ -300,7 +300,7 @@ void MouseCallbackFuncMapping(int event, int x, int y, int flags, void *userdata
       indices[currSelectStep] = find_closest_match(image_space_pos_after, pntCur);
       std::cerr << "After index:" << indices[currSelectStep] << std::endl;
     }
-      currSelectStep++;
+    currSelectStep++;
   }
 }
 
@@ -1038,7 +1038,10 @@ int main(int argc, char **argv)
 
       print_version_info(oo, "#\t");
       est.setInputCloud(sourcePtr);
-      est.setInputTarget(targetPtr);
+
+      PClPtr target_New = std::make_shared<PCl2D>();
+      *target_New = target_tmp;
+      est.setInputTarget(target_New);
 
       // Determine all reciprocal correspondences
       est.determineReciprocalCorrespondences(all_correspondences);
