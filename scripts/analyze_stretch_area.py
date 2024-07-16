@@ -3,6 +3,7 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 if __name__ == "__main__":
@@ -49,23 +50,27 @@ if __name__ == "__main__":
 
     hist, edges = np.histogram(ratio)
 
-    plt.hist(ratio, bins='auto')  # arguments are passed to np.histogram
+    plt.hist(ratio, bins=30)  # arguments are passed to np.histogram
     plt.title("Histogram with 'auto' bins")
     plt.savefig(output_path+"1d_histogram.pdf")
 
     plt.clf()
     
-    H, xedges, yedges = np.histogram2d(mapped_before, mapped_after, bins='auto')
+    H, xedges, yedges = np.histogram2d(mapped_before, mapped_after, bins=30)#, bins='auto')
     H = H.T
     fig, ax1 = plt.subplots(ncols=1)
 
-    ax1.pcolormesh(xedges, yedges, H, cmap='rainbow')
-    ax1.plot(x, 2*np.log(x), 'k-')
-    ax1.set_xlim(mapped_before.min(), mapped_before.max())
-    ax1.set_ylim(mapped_after.min(), mapped_after.max())
+    im = ax1.pcolormesh(xedges, yedges, H, cmap='rainbow')
+    ax1.set_xlim(xedges.min(), xedges.max())
+    ax1.set_ylim(yedges.min(), yedges.max())
     ax1.set_xlabel('before')
     ax1.set_ylabel('after')
     ax1.set_title('Area histogram')
+    ax1.plot(xedges, 1.*xedges)
+
+    divider = make_axes_locatable(ax1)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
 
     ax1.grid()
     fig.savefig(output_path+"2d_histogram.pdf")
