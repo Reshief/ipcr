@@ -294,14 +294,13 @@ void MouseCallbackFuncMapping(int event, int x, int y, int flags, void *userdata
     {
       indices[currSelectStep] = find_closest_match(image_space_pos_before, pntCur);
       std::cerr << "Before index:" << indices[currSelectStep] << std::endl;
-      currSelectStep++;
     }
     else if (currSelectStep == 1)
     {
       indices[currSelectStep] = find_closest_match(image_space_pos_after, pntCur);
       std::cerr << "After index:" << indices[currSelectStep] << std::endl;
-      currSelectStep++;
     }
+      currSelectStep++;
   }
 }
 
