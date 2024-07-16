@@ -14,6 +14,10 @@ if __name__ == "__main__":
                         help='Path to the full input positions of before')
     parser.add_argument('input_after',
                         help='Path to the full input positions of after')
+    parser.add_argument('input_before_img',
+                        help='Path to the full image of before')
+    parser.add_argument('input_after_img',
+                        help='Path to the full image of after')
     parser.add_argument('-o','--output_path', default=None,
                         help='Optional path to write output files to. Defaults to current directory')
 
@@ -22,6 +26,8 @@ if __name__ == "__main__":
     input_path = args.input_path
     input_before_path = args.input_before
     input_after_path = args.input_after
+    image_before_path = args.input_before_img
+    image_after_path = args.input_after_img
 
     output_path = args.output_path
     
@@ -44,17 +50,21 @@ if __name__ == "__main__":
     cell_index_before = cell_data_before#[:,0]
     cell_index_after = cell_data_after#[:,0]
 
-
-    full_before[:,0] -= mean_x_before
-    full_before[:,1] -= mean_y_before
-
-    full_after[:,0] -= mean_x_after
-    full_after[:,1] -= mean_y_after
+    full_after[:,0] -= mean_x_after + mean_x_before
+    full_after[:,1] -= mean_y_after + mean_y_before
 
 
     plt.clf()
     plt.scatter(full_before[:,0],full_before[:,1], c="tab:blue", label="before")
     plt.scatter(full_after[:,0],full_after[:,1], c="tab:red", label="after")
+
+
+    import matplotlib.image as mpimg
+    img = mpimg.imread(image_before_path)
+    imgplot = plt.imshow(img, alpha=0.5)
+
+    #img = mpimg.imread(image_after_path)
+    #imgplot = plt.imshow(img, alpha=0.5, )
 
     for i in range(len(cell_data)):
         before_ind = int(cell_index_before[i])
