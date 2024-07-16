@@ -34,7 +34,6 @@ if(WIN32)
   	ADD_DEFINITIONS(-D_WIN32_WINNT=0x0501)
 endif(WIN32)
 
-set(CMAKE_AUTOMOC ON)
 
 # add_subdirectory(extern/eigen)
 # add_subdirectory(extern/pcl)
@@ -43,7 +42,7 @@ find_package(PCL COMPONENTS REQUIRED)
 #find_package(PCL 1.13.1 REQUIRED)
 # find_package(OpenCV REQUIRED)
 find_package(OpenCV COMPONENTS REQUIRED)
-find_package(Qt5 COMPONENTS Core)
+
 add_subdirectory(extern/cxxopts/)
 
 include_directories(${PCL_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
@@ -90,4 +89,6 @@ target_include_directories(iterative_closest_point PUBLIC ${OpenCV_INCLUDE_DIRS}
 target_link_libraries (iterative_closest_point PRIVATE ${OpenCV_LIBS} cxxopts::cxxopts)
 target_link_libraries (iterative_closest_point PRIVATE ${PCL_LIBRARIES} )
 target_link_libraries(iterative_closest_point PRIVATE cmake_git_version_tracking)
+
+
 # target_link_libraries(iterative_closest_point PRIVATE ${PCL_LIBRARIES} opencv_ml opencv_dnn opencv_core opencv_flann cxxopts::cxxopts)
