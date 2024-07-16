@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
 
     full_before = np.loadtxt(input_before_path)
-    full_after = np.loadtxt(input_after_path)*0.9
+    full_after = np.loadtxt(input_after_path)
     full_after[:,0] *=0.9
 
     cell_data = np.loadtxt(input_path, ndmin=2, dtype=np.int32)
