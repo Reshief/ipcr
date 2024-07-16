@@ -30,19 +30,19 @@ if __name__ == "__main__":
     full_before = np.loadtxt(input_before_path)
     full_after = np.loadtxt(input_after_path)
 
-    cell_data = np.loadtxt(input_path, ndmin=2)
+    cell_data = np.loadtxt(input_path, ndmin=2, dtype=np.int32)
 
-    cell_data_before = cell_data[:,:1]
-    cell_data_after = cell_data[:,1:]
+    cell_data_before = cell_data[:,0]
+    cell_data_after = cell_data[:,1]
 
-    mean_x_before = np.average(full_before[:,0])
-    mean_y_before = np.average(full_before[:,1])
+    mean_x_before = np.average(full_before[cell_data_before[0],0])
+    mean_y_before = np.average(full_before[cell_data_before[0],1])
 
-    mean_x_after = np.average(full_after[:,0])
-    mean_y_after = np.average(full_after[:,1])
+    mean_x_after = np.average(full_after[cell_data_after[0],0])
+    mean_y_after = np.average(full_after[cell_data_after[0],1])
 
-    cell_index_before = cell_data_before[:,0]
-    cell_index_after = cell_data_after[:,0]
+    cell_index_before = cell_data_before#[:,0]
+    cell_index_after = cell_data_after#[:,0]
 
 
     full_before[:,0] -= mean_x_before
