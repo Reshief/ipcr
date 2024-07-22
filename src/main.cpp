@@ -1,9 +1,13 @@
 #include "cmaes.h"
 #include "parameters.h"
 #include "version.hpp"
+
+#include "match_points.hpp"
 #include <cxxopts.hpp>
 #include <fstream>
+#include <git.h>
 #include <iostream>
+#include <limits>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
@@ -11,8 +15,6 @@
 #include <pcl/point_types.h>
 #include <pcl/registration/correspondence_estimation.h>
 #include <pcl/registration/icp.h>
-#include <limits>
-#include <git.h>
 
 // 2d Point cloud datatype
 typedef pcl::PointCloud<pcl::PointXY> PCl2D;
@@ -26,9 +28,14 @@ const cv::Scalar highlight_color = cv::Scalar(0, 0, 255);
 const cv::Scalar selected_before_color = cv::Scalar(255, 255, 0);
 const cv::Scalar selected_after_color = cv::Scalar(0, 255, 100);
 
+float max_match_dist = 0.0;
+
+struct KDTreeLabel {
+  size_t before_index;
+};
+
 // Runtime-modified settings of the program
-struct Settings
-{
+struct Settings {
   // Translation according to the screen input using mouse and evolutionary fit
   float g_f_translate_x, g_f_translate_y;
   // Scaling according to the screen input using mouse and evolutionary fit
@@ -47,44 +54,36 @@ struct Settings
   int64_t match_index_before = -1;
   int64_t match_index_after = -1;
   // Reference points for before and after configurations
-  struct
-  {
+  struct {
     float x, y;
   } ref_before;
-  struct
-  {
+  struct {
     float x, y;
   } ref_after;
 };
 
-struct TransformSettings
-{
+struct TransformSettings {
   // Current streching settings
-  struct
-  {
+  struct {
     float x, y;
   } stretch;
 
   // Current shear settings
-  struct
-  {
+  struct {
     float x, y;
   } shear;
 
   // Specify two points in the before and after clouds that should correspond
-  struct
-  {
+  struct {
     float x, y;
   } target_before;
-  struct
-  {
+  struct {
     float x, y;
   } target_after;
 };
 
 // Configuration options loaded at start
-struct Configuration
-{
+struct Configuration {
   float g_f_stretch_x_min = -std::numeric_limits<float>::max();
   float g_f_stretch_x_max = std::numeric_limits<float>::max();
   float g_f_stretch_y_min = -std::numeric_limits<float>::max();
@@ -141,139 +140,118 @@ std::vector<pcl::PointXY> image_space_pos_before;
 std::vector<pcl::PointXY> image_space_pos_after;
 
 // Read configuration file
-bool readConfigFile(const std::string config_file_pathName, Configuration &config)
-{
+bool readConfigFile(const std::string config_file_pathName,
+                    Configuration &config) {
   std::string sKey;
   std::string sValue;
   std::ifstream f(config_file_pathName);
 
-  if (f.is_open())
-  {
-    while (!f.eof())
-    {
+  if (f.is_open()) {
+    while (!f.eof()) {
       f >> sKey >> sValue;
       f.ignore();
-      std::cerr << "Debug config: key(" << sKey << ") -> val(" << sValue << ")" << std::endl;
+      std::cerr << "Debug config: key(" << sKey << ") -> val(" << sValue << ")"
+                << std::endl;
       // Read scaling/stretching config
-      if (sKey == config_key_xscale_minimum)
-      {
+      if (sKey == config_key_xscale_minimum) {
         config.g_f_stretch_x_min = atof(sValue.data());
       }
-      if (sKey == config_key_xscale_maximum)
-      {
+      if (sKey == config_key_xscale_maximum) {
         config.g_f_stretch_x_max = atof(sValue.data());
       }
-      if (sKey == config_key_yscale_minimum)
-      {
+      if (sKey == config_key_yscale_minimum) {
         config.g_f_stretch_y_min = atof(sValue.data());
       }
-      if (sKey == config_key_yscale_maximum)
-      {
+      if (sKey == config_key_yscale_maximum) {
         config.g_f_stretch_y_max = atof(sValue.data());
       }
 
       // Read shear config
-      if (sKey == config_key_xshear_minimum)
-      {
+      if (sKey == config_key_xshear_minimum) {
         config.g_f_shear_x_min = atof(sValue.data());
       }
-      if (sKey == config_key_xshear_maximum)
-      {
+      if (sKey == config_key_xshear_maximum) {
         config.g_f_shear_x_max = atof(sValue.data());
       }
-      if (sKey == config_key_yshear_minimum)
-      {
+      if (sKey == config_key_yshear_minimum) {
         config.g_f_shear_y_min = atof(sValue.data());
       }
-      if (sKey == config_key_yshear_maximum)
-      {
+      if (sKey == config_key_yshear_maximum) {
         config.g_f_shear_y_max = atof(sValue.data());
       }
 
       // Read load time scale config
-      if (sKey == config_key_scaling_factor)
-      {
+      if (sKey == config_key_scaling_factor) {
         config.g_f_loadtime_scaling = atof(sValue.data());
       }
     }
     f.close();
     return true;
-  }
-  else
-  {
+  } else {
     std::cout << "Can't open file: " << config_file_pathName << std::endl;
     return false;
   }
 }
 
 // Mouse control
-void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata)
-{
-  // TODO: Fix issue with translation and redrawing. Probably need to rescale the translate offset in mouse callback
-  // FIX: Still issue with scale of translation and scaling based on the mouse callback
+void MouseCallBackFunc(int event, int x, int y, int flags, void *userdata) {
+  // TODO: Fix issue with translation and redrawing. Probably need to rescale
+  // the translate offset in mouse callback FIX: Still issue with scale of
+  // translation and scaling based on the mouse callback
 
   // Current and previous mouse pointer positions for distance calculations
   cv::Vec2f pntCur;
-  if (event == cv::EVENT_LBUTTONDOWN)
-  {
+  if (event == cv::EVENT_LBUTTONDOWN) {
     settings.g_bEventLButtonDown = true;
     pntCur[0] = x;
     pntCur[1] = y;
     mouse_control_point_beginf[0] = x;
     mouse_control_point_beginf[1] = y;
-  }
-  else if (event == cv::EVENT_LBUTTONUP)
-  {
+  } else if (event == cv::EVENT_LBUTTONUP) {
     settings.g_bEventLButtonDown = false;
-  }
-  else if (event == cv::EVENT_RBUTTONDOWN)
-  {
+  } else if (event == cv::EVENT_RBUTTONDOWN) {
     settings.g_bEventRButtonDown = true;
     pntCur[0] = x;
     pntCur[1] = y;
     mouse_control_point_beginf[0] = x;
     mouse_control_point_beginf[1] = y;
-  }
-  else if (event == cv::EVENT_RBUTTONUP)
-  {
+  } else if (event == cv::EVENT_RBUTTONUP) {
     settings.g_bEventRButtonDown = false;
-  }
-  else if (event == cv::EVENT_MOUSEMOVE)
-  {
+  } else if (event == cv::EVENT_MOUSEMOVE) {
     pntCur[0] = x;
     pntCur[1] = y;
-    if (settings.g_bEventLButtonDown == true)
-    {
+    if (settings.g_bEventLButtonDown == true) {
       float plot_range_x = max_plot.x - min_plot.x;
       float plot_range_y = max_plot.y - min_plot.y;
-      settings.g_f_translate_x = (pntCur[0] - mouse_control_point_beginf[0]) / img_size_x * plot_range_x;
-      settings.g_f_translate_y = (pntCur[1] - mouse_control_point_beginf[1]) / img_size_y * plot_range_y;
+      settings.g_f_translate_x = (pntCur[0] - mouse_control_point_beginf[0]) /
+                                 img_size_x * plot_range_x;
+      settings.g_f_translate_y = (pntCur[1] - mouse_control_point_beginf[1]) /
+                                 img_size_y * plot_range_y;
     }
 
-    if (settings.g_bEventRButtonDown == true)
-    {
-      settings.g_f_stretch_x = settings.g_f_stretch_x + (pntCur[0] - mouse_control_point_beginf[0]) * 0.001;
-      settings.g_f_stretch_y = settings.g_f_stretch_y + (pntCur[1] - mouse_control_point_beginf[1]) * 0.001;
+    if (settings.g_bEventRButtonDown == true) {
+      settings.g_f_stretch_x =
+          settings.g_f_stretch_x +
+          (pntCur[0] - mouse_control_point_beginf[0]) * 0.001;
+      settings.g_f_stretch_y =
+          settings.g_f_stretch_y +
+          (pntCur[1] - mouse_control_point_beginf[1]) * 0.001;
     }
-  }
-  else if (event == cv::EVENT_LBUTTONDBLCLK)
-  {
+  } else if (event == cv::EVENT_LBUTTONDBLCLK) {
     settings.g_bDoCmaes = true;
   }
 }
 
-int find_closest_match(const std::vector<pcl::PointXY> &ref, const pcl::PointXY &chosen)
-{
+int find_closest_match(const std::vector<pcl::PointXY> &ref,
+                       const pcl::PointXY &chosen) {
   float min_dist_sq = std::numeric_limits<float>::max();
   int chosen_index = -1;
-  for (int i = 0; i < ref.size(); i++)
-  {
+  for (int i = 0; i < ref.size(); i++) {
     float dx = (ref[i].x - chosen.x);
     float dy = (ref[i].y - chosen.y);
     float curr_dist_sq = dx * dx + dy * dy;
 
-    if (curr_dist_sq < min_dist_sq)
-    {
+    if (curr_dist_sq < min_dist_sq) {
       chosen_index = i;
       min_dist_sq = curr_dist_sq;
     }
@@ -282,22 +260,20 @@ int find_closest_match(const std::vector<pcl::PointXY> &ref, const pcl::PointXY 
 }
 
 // Mouse control for mapping selection
-void MouseCallbackFuncMapping(int event, int x, int y, int flags, void *userdata)
-{
+void MouseCallbackFuncMapping(int event, int x, int y, int flags,
+                              void *userdata) {
   pcl::PointXY pntCur;
-  if (event == cv::EVENT_LBUTTONUP)
-  {
+  if (event == cv::EVENT_LBUTTONUP) {
     pntCur.x = x;
     pntCur.y = y;
 
-    if (currSelectStep == 0)
-    {
-      indices[currSelectStep] = find_closest_match(image_space_pos_before, pntCur);
+    if (currSelectStep == 0) {
+      indices[currSelectStep] =
+          find_closest_match(image_space_pos_before, pntCur);
       std::cerr << "Before index:" << indices[currSelectStep] << std::endl;
-    }
-    else if (currSelectStep == 1)
-    {
-      indices[currSelectStep] = find_closest_match(image_space_pos_after, pntCur);
+    } else if (currSelectStep == 1) {
+      indices[currSelectStep] =
+          find_closest_match(image_space_pos_after, pntCur);
       std::cerr << "After index:" << indices[currSelectStep] << std::endl;
     }
     currSelectStep++;
@@ -306,8 +282,7 @@ void MouseCallbackFuncMapping(int event, int x, int y, int flags, void *userdata
 
 // Transformation calculation
 void transformPointCloud(const PCl2D &pcIn, PCl2D &pcOut,
-                         const TransformSettings &trans_settings)
-{
+                         const TransformSettings &trans_settings) {
   // Implements the shear and stretch steps
   cv::Mat shear_stretch = cv::Mat::eye(3, 3, CV_32F);
 
@@ -318,7 +293,8 @@ void transformPointCloud(const PCl2D &pcIn, PCl2D &pcOut,
   // configure shear
   shear_stretch.at<float>(0, 1) += trans_settings.shear.x;
   shear_stretch.at<float>(1, 0) += trans_settings.shear.y;
-  shear_stretch.at<float>(0, 0) += trans_settings.shear.y * trans_settings.shear.x;
+  shear_stretch.at<float>(0, 0) +=
+      trans_settings.shear.y * trans_settings.shear.x;
 
   // configure stretch
   shear_stretch.at<float>(0, 0) *= trans_settings.stretch.x;
@@ -334,14 +310,14 @@ void transformPointCloud(const PCl2D &pcIn, PCl2D &pcOut,
   shift_common_to_before.at<float>(0, 2) = trans_settings.target_before.x;
   shift_common_to_before.at<float>(1, 2) = trans_settings.target_before.y;
 
-  cv::Mat combined_transformation = shift_common_to_before * shear_stretch * shift_after_to_common;
+  cv::Mat combined_transformation =
+      shift_common_to_before * shear_stretch * shift_after_to_common;
 
   cv::Mat pntIn = cv::Mat::ones(3, 1, CV_32F);
   cv::Mat pntOut;
 
   pcOut.resize(pcIn.size());
-  for (int i = 0; i < pcIn.size(); ++i)
-  {
+  for (int i = 0; i < pcIn.size(); ++i) {
     pntIn.at<float>(0, 0) = pcIn.at(i).x;
     pntIn.at<float>(1, 0) = pcIn.at(i).y;
     pntIn.at<float>(2, 0) = 1.0;
@@ -353,10 +329,19 @@ void transformPointCloud(const PCl2D &pcIn, PCl2D &pcOut,
 }
 
 // Calculation of cost function, tx,ty: translation; sx, sy: scaling
-float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, const TransformSettings &trans_settings, const Configuration &config)
-{
-  // Range limitation. Output infinite cost if transformation outside of range of scales
-  if (trans_settings.stretch.x < config.g_f_stretch_x_min || trans_settings.stretch.x > config.g_f_stretch_x_max || trans_settings.stretch.y < config.g_f_stretch_y_min || trans_settings.stretch.y > config.g_f_stretch_y_max || trans_settings.shear.x < config.g_f_shear_x_min || trans_settings.shear.x > config.g_f_shear_x_max || trans_settings.shear.y < config.g_f_shear_y_min || trans_settings.shear.y > config.g_f_shear_y_max)
+float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr,
+                   const TransformSettings &trans_settings,
+                   const Configuration &config) {
+  // Range limitation. Output infinite cost if transformation outside of range
+  // of scales
+  if (trans_settings.stretch.x < config.g_f_stretch_x_min ||
+      trans_settings.stretch.x > config.g_f_stretch_x_max ||
+      trans_settings.stretch.y < config.g_f_stretch_y_min ||
+      trans_settings.stretch.y > config.g_f_stretch_y_max ||
+      trans_settings.shear.x < config.g_f_shear_x_min ||
+      trans_settings.shear.x > config.g_f_shear_x_max ||
+      trans_settings.shear.y < config.g_f_shear_y_min ||
+      trans_settings.shear.y > config.g_f_shear_y_max)
     return FLT_MAX;
 
   cv::Mat imgMerged = imgFixed.clone();
@@ -367,13 +352,13 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, const Trans
   PClPtr target_New = std::make_shared<PCl2D>();
 
   transformPointCloud(*targetPtr, *target_New, trans_settings);
-  for (int i = 0; i < target_New->size(); ++i)
-  {
-    cv::circle(imgMerged,
-               cv::Point(
-                   (target_New->at(i).x - min_plot.x) / plot_range_x * img_size_x,
-                   (target_New->at(i).y - min_plot.y) / plot_range_y * img_size_y),
-               3, after_color, -1);
+  for (int i = 0; i < target_New->size(); ++i) {
+    cv::circle(
+        imgMerged,
+        cv::Point(
+            (target_New->at(i).x - min_plot.x) / plot_range_x * img_size_x,
+            (target_New->at(i).y - min_plot.y) / plot_range_y * img_size_y),
+        3, after_color, -1);
   }
 
   pcl::registration::CorrespondenceEstimation<pcl::PointXY, pcl::PointXY> est;
@@ -385,26 +370,28 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr, const Trans
   est.setInputCloud(sourcePtr);
   est.setInputTarget(target_New);
 
+  std::cerr << "Matching with max dist:" << max_match_dist << std::endl;
+
   // Determine all reciprocal correspondences
-  est.determineReciprocalCorrespondences(all_correspondences);
+  est.determineReciprocalCorrespondences(all_correspondences, max_match_dist);
 
   float err = 0;
-  for (int i = 0; i < all_correspondences.size(); ++i)
-  {
+  for (int i = 0; i < all_correspondences.size(); ++i) {
     err += all_correspondences.at(i).distance;
   }
   err /= (all_correspondences.size() + 1) *
          (float(all_correspondences.size()) / float(sourcePtr->size())) *
          (float(all_correspondences.size()) / float(targetPtr->size()));
   // err/=all_correspondences.size()+1; //not work for large cluster
-  std::cout << "Cost: Matches=" << all_correspondences.size() << "[b:" << sourcePtr->size() << "|a:" << targetPtr->size() << "]"
+  std::cout << "Cost: Matches=" << all_correspondences.size()
+            << "[b:" << sourcePtr->size() << "|a:" << targetPtr->size() << "]"
             << "	Error:" << err << "\n";
   return err;
 }
 
 // CMA-ES optimization
-void doCMAES(const PClPtr &source, const PClPtr &target, const Settings &trafo_settings, const Configuration &config)
-{
+void doCMAES(const PClPtr &source, const PClPtr &target,
+             const Settings &trafo_settings, const Configuration &config) {
   CMAES<float> evo;  // the optimizer
   float *const *pop; // sampled population
   float *fitvals;    // objective function values of sampled population
@@ -462,8 +449,7 @@ void doCMAES(const PClPtr &source, const PClPtr &target, const Settings &trafo_s
   std::cout << evo.sayHello() << std::endl;
   evo.countevals = countevals; // a hack, effects the output and termination
 
-  while (!evo.testForTermination())
-  {
+  while (!evo.testForTermination()) {
     // Generate population of new candidate solutions
     pop = evo.samplePopulation(); // do not change content of pop
 
@@ -477,8 +463,7 @@ void doCMAES(const PClPtr &source, const PClPtr &target, const Settings &trafo_s
      */
 
     // Compute fitness value for each candidate solution
-    for (int i = 0; i < evo.get(CMAES<float>::PopSize); ++i)
-    {
+    for (int i = 0; i < evo.get(CMAES<float>::PopSize); ++i) {
       /* You may resample the solution i until it lies within the
               feasible domain here, e.g. until it satisfies given
               box constraints (variable boundaries). The function
@@ -494,12 +479,15 @@ void doCMAES(const PClPtr &source, const PClPtr &target, const Settings &trafo_s
       */
       TransformSettings transform_settings{};
 
-      if (trafo_settings.has_matching)
-      {
-        transform_settings.target_before.x = source->at(trafo_settings.match_index_before).x;
-        transform_settings.target_before.y = source->at(trafo_settings.match_index_before).y;
-        transform_settings.target_after.x = target->at(trafo_settings.match_index_after).x;
-        transform_settings.target_after.y = target->at(trafo_settings.match_index_after).y;
+      if (trafo_settings.has_matching) {
+        transform_settings.target_before.x =
+            source->at(trafo_settings.match_index_before).x;
+        transform_settings.target_before.y =
+            source->at(trafo_settings.match_index_before).y;
+        transform_settings.target_after.x =
+            target->at(trafo_settings.match_index_after).x;
+        transform_settings.target_after.y =
+            target->at(trafo_settings.match_index_after).y;
       }
       transform_settings.stretch.x = 1.0 + pop[i][0] * 0.01;
       transform_settings.stretch.y = 1.0 + pop[i][1] * 0.01;
@@ -514,8 +502,7 @@ void doCMAES(const PClPtr &source, const PClPtr &target, const Settings &trafo_s
 
   // keep best ever solution
   // if (irun == 0 || evo.get(CMAES<float>::FBestEver) < fbestever)
-  if (evo.get(CMAES<float>::FBestEver) < fbestever)
-  {
+  if (evo.get(CMAES<float>::FBestEver) < fbestever) {
     fbestever = evo.get(CMAES<float>::FBestEver);
     xbestever = evo.getInto(CMAES<float>::XBestEver,
                             xbestever); // allocates memory if needed
@@ -526,15 +513,21 @@ void doCMAES(const PClPtr &source, const PClPtr &target, const Settings &trafo_s
   settings.g_f_shear_x = xbestever[2] * 0.01;
   settings.g_f_shear_y = xbestever[3] * 0.01;
 
-  std::cout << "translate: [" << settings.g_f_translate_x << "|" << settings.g_f_translate_y << "]" << std::endl;
-  std::cout << "stretch: [" << settings.g_f_stretch_x << "|" << settings.g_f_stretch_y << "]" << std::endl;
-  std::cout << "shear lim x: " << config.g_f_shear_x_min << "<" << settings.g_f_shear_x << " < " << config.g_f_shear_x_max << std::endl;
-  std::cout << "shear lim y: " << config.g_f_shear_y_min << "<" << settings.g_f_shear_y << " < " << config.g_f_shear_y_max << std::endl;
-  std::cout << "shear: [" << settings.g_f_shear_x << "|" << settings.g_f_shear_y << "]" << std::endl;
+  std::cout << "translate: [" << settings.g_f_translate_x << "|"
+            << settings.g_f_translate_y << "]" << std::endl;
+  std::cout << "stretch: [" << settings.g_f_stretch_x << "|"
+            << settings.g_f_stretch_y << "]" << std::endl;
+  std::cout << "shear lim x: " << config.g_f_shear_x_min << "<"
+            << settings.g_f_shear_x << " < " << config.g_f_shear_x_max
+            << std::endl;
+  std::cout << "shear lim y: " << config.g_f_shear_y_min << "<"
+            << settings.g_f_shear_y << " < " << config.g_f_shear_y_max
+            << std::endl;
+  std::cout << "shear: [" << settings.g_f_shear_x << "|" << settings.g_f_shear_y
+            << "]" << std::endl;
 }
 
-bool replace(std::string &str, const std::string &from, const std::string &to)
-{
+bool replace(std::string &str, const std::string &from, const std::string &to) {
   size_t start_pos = str.find(from);
   if (start_pos == std::string::npos)
     return false;
@@ -542,27 +535,28 @@ bool replace(std::string &str, const std::string &from, const std::string &to)
   return true;
 }
 
-void print_version_info(std::ostream &stream, const std::string &line_prefix = "")
-{
+void print_version_info(std::ostream &stream,
+                        const std::string &line_prefix = "") {
   stream << line_prefix << "VERSION INFORMATION" << std::endl;
-  stream << line_prefix << "Program version: " << icp::get_version() << std::endl;
-  if (git::IsPopulated())
-  {
+  stream << line_prefix << "Program version: " << icp::get_version()
+         << std::endl;
+  if (git::IsPopulated()) {
     stream << line_prefix << "GIT Branch:" << git::Branch() << std::endl;
     stream << line_prefix << "GIT Commit:" << git::CommitSHA1() << std::endl;
-    stream << line_prefix << "GIT Has uncommitted changes:" << (git::AnyUncommittedChanges() ? "yes" : "no") << std::endl;
-    stream << line_prefix << "GIT Commit date:" << git::CommitDate() << std::endl;
+    stream << line_prefix << "GIT Has uncommitted changes:"
+           << (git::AnyUncommittedChanges() ? "yes" : "no") << std::endl;
+    stream << line_prefix << "GIT Commit date:" << git::CommitDate()
+           << std::endl;
   }
 }
 
-std::vector<pcl::PointXY> to_image_space(const PClPtr &cloudptr, const Settings &image_settings)
-{
+std::vector<pcl::PointXY> to_image_space(const PClPtr &cloudptr,
+                                         const Settings &image_settings) {
   std::vector<pcl::PointXY> res(cloudptr->size());
   float plot_range_x = max_plot.x - min_plot.x;
   float plot_range_y = max_plot.y - min_plot.y;
 
-  for (size_t i = 0; i < cloudptr->size(); i++)
-  {
+  for (size_t i = 0; i < cloudptr->size(); i++) {
     // Plot the points as rectangles on the screen
     // cv::circle(imgFixed, cv::Point(x,y), 3, cv::Scalar(0,255,0),-1); //1
     res[i].x = (cloudptr->at(i).x - min_plot.x) / plot_range_x * img_size_x;
@@ -572,8 +566,8 @@ std::vector<pcl::PointXY> to_image_space(const PClPtr &cloudptr, const Settings 
   return res;
 }
 
-void input_mapping(const PClPtr &source, const PClPtr &target, Settings &map_settings)
-{
+void input_mapping(const PClPtr &source, const PClPtr &target,
+                   Settings &map_settings) {
   isSelectMode = true;
   currSelectStep = 0;
 
@@ -585,44 +579,40 @@ void input_mapping(const PClPtr &source, const PClPtr &target, Settings &map_set
   cv::namedWindow("Mapping");
   cv::setMouseCallback("Mapping", MouseCallbackFuncMapping, NULL);
 
-  cv::Scalar colors[2][2] = {{highlight_color, lowlight_color}, {lowlight_color, highlight_color}};
+  cv::Scalar colors[2][2] = {{highlight_color, lowlight_color},
+                             {lowlight_color, highlight_color}};
 
-  while (currSelectStep < indices.size())
-  {
+  while (currSelectStep < indices.size()) {
     cv::Mat img_mapping = cv::Mat::zeros(img_size_x, img_size_y, CV_8UC3);
 
     // Plot before and after images
-    for (size_t i = 0; i < image_space_pos_before.size(); i++)
-    {
-      cv::Scalar rendercolor = (currSelectStep > 0 ? (i == indices[0] ? selected_before_color : colors[currSelectStep][0]) : colors[currSelectStep][0]);
+    for (size_t i = 0; i < image_space_pos_before.size(); i++) {
+      cv::Scalar rendercolor =
+          (currSelectStep > 0 ? (i == indices[0] ? selected_before_color
+                                                 : colors[currSelectStep][0])
+                              : colors[currSelectStep][0]);
       cv::rectangle(img_mapping,
-                    cv::Point(
-                        image_space_pos_before[i].x - 2,
-                        image_space_pos_before[i].y - 2),
-                    cv::Point(
-                        image_space_pos_before[i].x + 2,
-                        image_space_pos_before[i].y + 2),
+                    cv::Point(image_space_pos_before[i].x - 2,
+                              image_space_pos_before[i].y - 2),
+                    cv::Point(image_space_pos_before[i].x + 2,
+                              image_space_pos_before[i].y + 2),
                     rendercolor, -1);
     }
-    for (size_t i = 0; i < image_space_pos_before.size(); i++)
-    {
-      cv::circle(img_mapping,
-                 cv::Point(
-                     image_space_pos_after[i].x,
-                     image_space_pos_after[i].y),
-                 3, colors[currSelectStep][1], -1);
+    for (size_t i = 0; i < image_space_pos_before.size(); i++) {
+      cv::circle(
+          img_mapping,
+          cv::Point(image_space_pos_after[i].x, image_space_pos_after[i].y), 3,
+          colors[currSelectStep][1], -1);
     }
 
     cv::imshow("Mapping", img_mapping);
     char szKey = cv::waitKey(100);
     // stop when escape is pressed
-    if (27 == szKey)
-    {
+    if (27 == szKey) {
       break;
     }
     // Check if the window was closed
-    if (!cv::getWindowProperty("Mapping", cv::WND_PROP_VISIBLE))
-    {
+    if (!cv::getWindowProperty("Mapping", cv::WND_PROP_VISIBLE)) {
       break;
     }
   }
@@ -630,34 +620,28 @@ void input_mapping(const PClPtr &source, const PClPtr &target, Settings &map_set
   image_space_pos_before.clear();
   image_space_pos_after.clear();
 
-  if (cv::getWindowProperty("Mapping", cv::WND_PROP_VISIBLE))
-  {
+  if (cv::getWindowProperty("Mapping", cv::WND_PROP_VISIBLE)) {
     cv::destroyWindow("Mapping");
   }
 
-  if (currSelectStep >= 2)
-  {
+  if (currSelectStep >= 2) {
     settings.has_matching = true;
     settings.match_index_before = indices[0];
     settings.match_index_after = indices[1];
-  }
-  else
-  {
+  } else {
     settings.has_matching = false;
     settings.match_index_before = -1;
     settings.match_index_after = -1;
   }
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 
   cxxopts::Options options(
       argv[0],
       "Iterative optimizer to find the best match between points before and "
       "after a linear transformation (stretch/shear).");
-  try
-  {
+  try {
 
     options.add_options() // Initialize available options
         ("input_before", "Path of the input file of the before state.",
@@ -682,8 +666,8 @@ int main(int argc, char **argv)
              "true")) // Flag to enable verbose output
         ("d,debug", "Enable debugging.",
          cxxopts::value<bool>()->default_value("false")->implicit_value(
-             "true"))                        // a bool parameter to enable debugging
-        ("h,help", "Print usage.")           // allow help to display
+             "true"))              // a bool parameter to enable debugging
+        ("h,help", "Print usage.") // allow help to display
         ("version", "Display version info.") // display version info below
         ;
 
@@ -692,9 +676,7 @@ int main(int argc, char **argv)
 
     options.positional_help("<input_before> <input_after> <output_prefix>");
     options.show_positional_help();
-  }
-  catch (const cxxopts::exceptions::specification &e)
-  {
+  } catch (const cxxopts::exceptions::specification &e) {
     // Error handling if something about the definition failed
     std::cerr << "ERROR:\t" << e.what() << std::endl;
     exit(EXIT_FAILURE);
@@ -723,63 +705,48 @@ int main(int argc, char **argv)
 
   bool options_error = false;
 
-  try
-  {
+  try {
     auto result = options.parse(argc, argv);
 
-    if (result.count("help"))
-    {
+    if (result.count("help")) {
       std::cout << options.help() << std::endl;
       exit(EXIT_SUCCESS);
     }
 
-    if (result.count("version"))
-    {
+    if (result.count("version")) {
       print_version_info(std::cout);
 
       exit(EXIT_SUCCESS);
     }
 
-    if (result.count("input_before"))
-    {
+    if (result.count("input_before")) {
       config.positions_before_path = result["input_before"].as<std::string>();
-    }
-    else
-    {
+    } else {
       options_error = true;
       std::cerr << "ERROR:\t Missing input file of before point positions "
                 << std::endl;
     }
-    if (result.count("input_after"))
-    {
+    if (result.count("input_after")) {
       config.positions_after_path = result["input_after"].as<std::string>();
-    }
-    else
-    {
+    } else {
       options_error = true;
       std::cerr << "ERROR:\t Missing input file of after point positions "
                 << std::endl;
     }
-    if (result.count("output_prefix"))
-    {
+    if (result.count("output_prefix")) {
       config.output_prefix = result["output_prefix"].as<std::string>();
-    }
-    else
-    {
+    } else {
       options_error = true;
       std::cerr << "ERROR:\t Missing output path prefix" << std::endl;
     }
-    if (result.count("config_file"))
-    {
+    if (result.count("config_file")) {
       config.config_file_path = result["config_file"].as<std::string>();
-      if (config.config_file_path.empty())
-      {
+      if (config.config_file_path.empty()) {
         config.config_file_path = "./conf/config.txt";
-        std::cerr << "No config file provided, defaulting to: " << config.config_file_path << std::endl;
+        std::cerr << "No config file provided, defaulting to: "
+                  << config.config_file_path << std::endl;
       }
-    }
-    else
-    {
+    } else {
       config.config_file_path = "./conf/config.txt";
     }
 
@@ -787,14 +754,11 @@ int main(int argc, char **argv)
       config.debugging_enabled = result["debug"].as<bool>();
     if (result.count("verbose"))
       config.verbose_output = result["verbose"].as<bool>();
-  }
-  catch (const cxxopts::exceptions::parsing &e)
-  {
+  } catch (const cxxopts::exceptions::parsing &e) {
     std::cerr << "ERROR:\t" << e.what() << std::endl;
     exit(EXIT_FAILURE);
   }
-  if (options_error)
-  {
+  if (options_error) {
     std::cerr << "There have been errors while processing the program's input "
                  "options. Please use option -h or --help to display the help."
               << std::endl;
@@ -819,7 +783,8 @@ int main(int argc, char **argv)
   // std::ifstream inAreaFileSrc(area_before_path); // unused
   // std::ifstream inAreaFileTar(area_after_path); // unused
 
-  // pointers initialized with actually allocated data to prevent crashes on cleanup
+  // pointers initialized with actually allocated data to prevent crashes on
+  // cleanup
   PClPtr sourcePtr = std::make_shared<PCl2D>();
   PClPtr targetPtr = std::make_shared<PCl2D>();
 
@@ -836,8 +801,7 @@ int main(int argc, char **argv)
 
   pcl::PointXY input_point{};
   // read and plot the srouce point cloud
-  while (infileSrc >> input_point.x >> input_point.y)
-  {
+  while (infileSrc >> input_point.x >> input_point.y) {
     before_points.push_back(input_point);
     before_avg.x += input_point.x;
     before_avg.y += input_point.y;
@@ -848,8 +812,7 @@ int main(int argc, char **argv)
   before_avg.x /= float(before_count);
   before_avg.y /= float(before_count);
 
-  while (infileTar >> input_point.x >> input_point.y)
-  {
+  while (infileTar >> input_point.x >> input_point.y) {
     after_points.push_back(input_point);
     after_avg.x += input_point.x;
     after_avg.y += input_point.y;
@@ -860,11 +823,13 @@ int main(int argc, char **argv)
   after_avg.x /= float(before_count);
   after_avg.y /= float(before_count);
 
-  pcl::PointXY max_pos(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max()), min_pos(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+  pcl::PointXY max_pos(-std::numeric_limits<float>::max(),
+                       -std::numeric_limits<float>::max()),
+      min_pos(std::numeric_limits<float>::max(),
+              std::numeric_limits<float>::max());
 
   // Normalize COM position and find outer bounds of all points
-  for (pcl::PointXY &point : before_points)
-  {
+  for (pcl::PointXY &point : before_points) {
     point.x -= before_avg.x;
     point.y -= before_avg.y;
 
@@ -875,8 +840,7 @@ int main(int argc, char **argv)
     min_pos.y = std::min(min_pos.y, point.y);
   }
 
-  for (pcl::PointXY &point : after_points)
-  {
+  for (pcl::PointXY &point : after_points) {
     point.x -= after_avg.x;
     point.y -= after_avg.y;
 
@@ -903,56 +867,59 @@ int main(int argc, char **argv)
   float plot_range_y = max_plot.y - min_plot.y;
 
   // Plot points and transform into common
-  for (int i = 0; i < before_points.size(); i++)
-  {
+  for (int i = 0; i < before_points.size(); i++) {
     pcl::PointXY &point = before_points[i];
     sourcePtr->push_back(point);
   }
 
   // read and plot the target point cloud
-  for (int i = 0; i < after_points.size(); i++)
-  {
+  for (int i = 0; i < after_points.size(); i++) {
     pcl::PointXY &point = after_points[i];
     targetPtr->push_back(point);
   }
+
+  max_match_dist = find_mapping_distance(sourcePtr);
+
+  std::cerr << "max matching distance: " << max_match_dist << std::endl;
 
   std::cout << "Press 'ESC' to quit" << std::endl;
 
   cv::namedWindow("Merge");
   cv::setMouseCallback("Merge", MouseCallBackFunc, NULL);
-  while (true)
-  {
+  while (true) {
     PCl2D target_tmp;
 
     imgFixed = cv::Mat::zeros(img_size_x, img_size_y, CV_8UC3);
 
     // Plot points and transform into common
-    for (int i = 0; i < before_points.size(); i++)
-    {
+    for (int i = 0; i < before_points.size(); i++) {
       pcl::PointXY &point = before_points[i];
-      cv::Scalar rendercolor = (settings.has_matching ? (i == indices[0] ? selected_before_color : before_color) : before_color);
+      cv::Scalar rendercolor =
+          (settings.has_matching
+               ? (i == indices[0] ? selected_before_color : before_color)
+               : before_color);
       // Plot the points as rectangles on the screen
       // cv::circle(imgFixed, cv::Point(x,y), 3, cv::Scalar(0,255,0),-1); //1
-      cv::rectangle(imgFixed,
-                    cv::Point(
-                        (point.x - min_plot.x) / plot_range_x * img_size_x - 2,
-                        (point.y - min_plot.y) / plot_range_y * img_size_y - 2),
-                    cv::Point(
-                        (point.x - min_plot.x) / plot_range_x * img_size_x + 2,
-                        (point.y - min_plot.y) / plot_range_y * img_size_y + 2),
-                    rendercolor, -1);
+      cv::rectangle(
+          imgFixed,
+          cv::Point((point.x - min_plot.x) / plot_range_x * img_size_x - 2,
+                    (point.y - min_plot.y) / plot_range_y * img_size_y - 2),
+          cv::Point((point.x - min_plot.x) / plot_range_x * img_size_x + 2,
+                    (point.y - min_plot.y) / plot_range_y * img_size_y + 2),
+          rendercolor, -1);
     }
 
-    if (settings.has_matching)
-    {
+    if (settings.has_matching) {
       // Get reference data from array
-      default_transform.target_before.x = sourcePtr->at(settings.match_index_before).x;
-      default_transform.target_before.y = sourcePtr->at(settings.match_index_before).y;
-      default_transform.target_after.x = targetPtr->at(settings.match_index_after).x;
-      default_transform.target_after.y = targetPtr->at(settings.match_index_after).y;
-    }
-    else
-    {
+      default_transform.target_before.x =
+          sourcePtr->at(settings.match_index_before).x;
+      default_transform.target_before.y =
+          sourcePtr->at(settings.match_index_before).y;
+      default_transform.target_after.x =
+          targetPtr->at(settings.match_index_after).x;
+      default_transform.target_after.y =
+          targetPtr->at(settings.match_index_after).y;
+    } else {
       // The default reference points are the averages normalized to zero
       default_transform.target_after.x = 0.;
       default_transform.target_after.y = 0.;
@@ -969,14 +936,15 @@ int main(int argc, char **argv)
 
     transformPointCloud(*targetPtr, target_tmp, default_transform);
     // read and plot the target point cloud
-    for (int i = 0; i < after_points.size(); i++)
-    {
+    for (int i = 0; i < after_points.size(); i++) {
       pcl::PointXY &point = target_tmp.at(i);
-      cv::Scalar rendercolor = (settings.has_matching ? (i == indices[1] ? selected_after_color : after_color) : after_color);
+      cv::Scalar rendercolor =
+          (settings.has_matching
+               ? (i == indices[1] ? selected_after_color : after_color)
+               : after_color);
       cv::circle(imgMerged,
-                 cv::Point(
-                     (point.x - min_plot.x) / plot_range_x * img_size_x,
-                     (point.y - min_plot.y) / plot_range_y * img_size_y),
+                 cv::Point((point.x - min_plot.x) / plot_range_x * img_size_x,
+                           (point.y - min_plot.y) / plot_range_y * img_size_y),
                  3, rendercolor, -1);
     }
 
@@ -985,16 +953,14 @@ int main(int argc, char **argv)
     // stop when escape is pressed
     if (27 == szKey)
       break;
-    else if (szKey == 'm')
-    {
+    else if (szKey == 'm') {
       cv::destroyWindow("Merge");
       input_mapping(sourcePtr, targetPtr, settings);
       cv::namedWindow("Merge");
       cv::setMouseCallback("Merge", MouseCallBackFunc, NULL);
     }
     // Check if the window was closed
-    else if (!cv::getWindowProperty("Merge", cv::WND_PROP_VISIBLE))
-    {
+    else if (!cv::getWindowProperty("Merge", cv::WND_PROP_VISIBLE)) {
       break;
     }
 
@@ -1008,10 +974,9 @@ int main(int argc, char **argv)
     est.setInputTarget(targetPtr);
 
     // Determine all reciprocal correspondences
-    est.determineReciprocalCorrespondences(all_correspondences);
+    est.determineReciprocalCorrespondences(all_correspondences, max_match_dist);
     float err = 0;
-    for (int i = 0; i < all_correspondences.size(); ++i)
-    {
+    for (int i = 0; i < all_correspondences.size(); ++i) {
       err += all_correspondences.at(i).distance;
     }
     err /= all_correspondences.size() + 1;
@@ -1020,8 +985,7 @@ int main(int argc, char **argv)
     // std::cout << all_correspondences.size() << "	" << err << "\n";
 
     // Optimize the transformation based on current correspondences
-    if (settings.g_bDoCmaes == true)
-    {
+    if (settings.g_bDoCmaes == true) {
       doCMAES(sourcePtr, targetPtr, settings, config);
       settings.g_bDoCmaes = false;
 
@@ -1030,9 +994,9 @@ int main(int argc, char **argv)
       std::string oo_path = config.output_prefix + "_mapping.txt";
       oo.open(oo_path);
 
-      if (!oo.is_open() || !oo.good())
-      {
-        std::cerr << "[ERROR]:\tFailed to open output file: " << oo_path << std::endl;
+      if (!oo.is_open() || !oo.good()) {
+        std::cerr << "[ERROR]:\tFailed to open output file: " << oo_path
+                  << std::endl;
         exit(EXIT_FAILURE);
       }
 
@@ -1047,8 +1011,7 @@ int main(int argc, char **argv)
       est.determineReciprocalCorrespondences(all_correspondences);
 
       float err = 0;
-      for (int i = 0; i < all_correspondences.size(); ++i)
-      {
+      for (int i = 0; i < all_correspondences.size(); ++i) {
         oo << all_correspondences.at(i).index_query << "	"
            << all_correspondences.at(i).index_match << "\n";
       }
@@ -1061,16 +1024,15 @@ int main(int argc, char **argv)
 
       ooAll.open(ooall_path);
 
-      if (!ooAll.is_open() || !ooAll.good())
-      {
-        std::cerr << "[ERROR]:\tFailed to open output file: " << ooall_path << std::endl;
+      if (!ooAll.is_open() || !ooAll.good()) {
+        std::cerr << "[ERROR]:\tFailed to open output file: " << ooall_path
+                  << std::endl;
         exit(EXIT_FAILURE);
       }
 
       print_version_info(ooAll, "#\t");
 
-      for (int i = 0; i < all_correspondences.size(); ++i)
-      {
+      for (int i = 0; i < all_correspondences.size(); ++i) {
         pcl::PointXY pntSource;
         pntSource = sourcePtr->points.at(all_correspondences.at(i).index_query);
         pcl::PointXY pntTargetNew;
@@ -1081,8 +1043,9 @@ int main(int argc, char **argv)
         // all_correspondences.at(i).index_match << " " << pntTargetNew.x/0.2 <<
         // " " << pntTargetNew.y/0.2<<"\n";
         ooAll << all_correspondences.at(i).index_query << " "
-              << pntSource.x / config.g_f_loadtime_scaling << " " << pntSource.y / config.g_f_loadtime_scaling
-              << " " << all_correspondences.at(i).index_match << " "
+              << pntSource.x / config.g_f_loadtime_scaling << " "
+              << pntSource.y / config.g_f_loadtime_scaling << " "
+              << all_correspondences.at(i).index_match << " "
               << pntTargetNew.x / config.g_f_loadtime_scaling << " "
               << pntTargetNew.y / config.g_f_loadtime_scaling << "\n";
       }
