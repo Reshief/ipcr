@@ -1,7 +1,7 @@
 #ifndef __MATCH_POINTS_H__
 #define __MATCH_POINTS_H__
 
-#include "search_tree/kd_tree.hpp"
+//#include "search_tree/kd_tree.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
