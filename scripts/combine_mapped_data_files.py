@@ -42,10 +42,10 @@ if __name__ == "__main__":
     with open(output_path, "w") as out:
         for i in range(len(mappings)):
             out.write(
-                "{}\t{}\t{}\t{}\n".format(
-                    input_mapping[i, 0],
-                    input_mapping[i, 1],
-                    list(before_data[input_mapping[i, 0]]).join("\t"),
-                    list(after_data[input_mapping[i, 1]]).join("\t"),
+                "{:d}\t{:d}\t{}\t{}\n".format(
+                    mappings[i, 0],
+                    mappings[i, 1],
+                    "\t".join(list(before_data[mappings[i, 0]])),
+                    "\t".join(list(after_data[mappings[i, 1]])),
                 )
             )
