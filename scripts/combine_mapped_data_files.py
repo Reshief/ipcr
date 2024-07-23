@@ -10,16 +10,14 @@ if __name__ == "__main__":
         description="Script to plot a before and after of the positions of cells in stretching to verify mapping."
     )
     parser.add_argument(
-        "input_mapping", required=True, help='Path to the "_mapping.txt" mapping output'
+        "input_mapping", help='Path to the "_mapping.txt" mapping output'
     )
     parser.add_argument(
         "input_before",
-        required=True,
         help="Path to the full input file associated with the before",
     )
     parser.add_argument(
         "input_after",
-        required=True,
         help="Path to the full input file associated with the after",
     )
     parser.add_argument(
