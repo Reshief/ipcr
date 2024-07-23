@@ -45,7 +45,7 @@ if __name__ == "__main__":
                 "{:d}\t{:d}\t{}\t{}\n".format(
                     mappings[i, 0],
                     mappings[i, 1],
-                    "\t".join(list(before_data[mappings[i, 0]])),
-                    "\t".join(list(after_data[mappings[i, 1]])),
+                    "\t".join([str(x) for x in list(before_data[mappings[i, 0]])]),
+                    "\t".join([str(x) for x in list(after_data[mappings[i, 1]])]),
                 )
             )
