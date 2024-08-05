@@ -8,6 +8,7 @@
 #include <pcl/common/distances.h>
 #include <pcl/point_types.h>
 #include <pcl/registration/icp.h>
+#include <queue>
 #include <vector>
 
 /*void match_points(const pcl::PointCloud<pcl::PointXY>::Ptr &sourcePtr, const
@@ -58,6 +59,63 @@ float find_mapping_distance(const pcl::PointCloud<pcl::PointXY>::Ptr &cloud) {
    * consideration
    */
   return std::sqrt(min_dist_sq[num_points / 2]) * 0.7;
+}
+
+std::pair<float, std::vector<std::pair<size_t, size_t>>>
+find_mapping(const pcl::PointCloud<pcl::PointXY>::Ptr &clouda,
+             const pcl::PointCloud<pcl::PointXY>::Ptr &cloudb,
+             float cutoff = std::numeric_limits<float>::max()) {
+  size_t before_count = clouda->size();
+  size_t after_count = cloudb->size();
+
+  std::vector<bool> before_matched(before_count, false);
+  std::vector<bool> after_matched(after_count, false);
+  typedef std::pair<float, std::pair<size_t, size_t>> mapping_entry;
+  std::priority_queue<mapping_entry, std::vector<mapping_entry>,
+                      std::greater<mapping_entry>>
+      queue;
+
+  std::vector<pcl::PointXY> pointsa, pointsb;
+
+  for (size_t i_p = 0; i_p < before_count; i_p++) {
+    pointsa.push_back(clouda->at(i_p));
+  }
+
+  for (size_t i_p = 0; i_p < after_count; i_p++) {
+    pointsb.push_back(cloudb->at(i_p));
+  }
+
+  float sq_cutoff = cutoff * cutoff;
+
+  // Calculate the minimum neighbor distance of all cells
+  for (size_t i_p = 0; i_p < before_count; i_p++) {
+    for (size_t j_p = 0; j_p < after_count; j_p++) {
+      float dist_sq = pcl::squaredEuclideanDistance(pointsa[i_p], pointsb[j_p]);
+      if (dist_sq < sq_cutoff) {
+        queue.push({dist_sq, {i_p, j_p}});
+      }
+    }
+  }
+
+  std::vector<std::pair<size_t, size_t>> mapping;
+
+  float total_err = 0.0f;
+
+  for (; !queue.empty(); queue.pop()) {
+    auto entry = queue.top();
+
+    size_t before_p = entry.second.first;
+    size_t after_p = entry.second.second;
+
+    if (!before_matched[before_p] && !after_matched[after_p]) {
+      before_matched[before_p] = true;
+      after_matched[after_p] = true;
+      mapping.push_back({before_p, after_p});
+      total_err += std::sqrt(entry.first);
+    }
+  }
+
+  return {total_err, mapping};
 }
 
 #endif
