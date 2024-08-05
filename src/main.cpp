@@ -96,6 +96,8 @@ struct Configuration {
 
   float g_f_loadtime_scaling = 1.0;
 
+  float max_match_distance_scale = 1.0;
+
   std::string positions_before_path; // Path to before point positions
   std::string positions_after_path;  // Path to after point positions
   std::string area_before_path;      // Path to before area file (unused)
@@ -667,6 +669,9 @@ int main(int argc, char **argv) {
         ("d,debug", "Enable debugging.",
          cxxopts::value<bool>()->default_value("false")->implicit_value(
              "true"))              // a bool parameter to enable debugging
+        ("l,cutoff_scale", "Scaling factor to scale the maximum distance for points to be considered possible matches. Is multiplied to a scale factor calculated from the median distance between closest neighbors in the before image. Default: 1.0.",
+         cxxopts::value<float>()->default_value("1.0")) // Parameter to set the scale for the maximum cutoff
+      
         ("h,help", "Print usage.") // allow help to display
         ("version", "Display version info.") // display version info below
         ;
@@ -754,6 +759,10 @@ int main(int argc, char **argv) {
       config.debugging_enabled = result["debug"].as<bool>();
     if (result.count("verbose"))
       config.verbose_output = result["verbose"].as<bool>();
+
+    if(result.count("cutoff_scale")){
+      config.max_match_distance_scale = result["cutoff_scale"].as<float>();
+    }
   } catch (const cxxopts::exceptions::parsing &e) {
     std::cerr << "ERROR:\t" << e.what() << std::endl;
     exit(EXIT_FAILURE);
@@ -881,6 +890,8 @@ int main(int argc, char **argv) {
   max_match_dist = find_mapping_distance(sourcePtr);
 
   std::cerr << "max matching distance: " << max_match_dist << std::endl;
+  max_match_dist *=  config.max_match_distance_scale;
+  std::cerr << "-> Scaled based on config: " << max_match_dist << std::endl;
 
   std::cout << "Press 'ESC' to quit" << std::endl;
 
