@@ -14,10 +14,10 @@ if __name__ == "__main__":
                         help='Path to the full input positions of before')
     parser.add_argument('input_after',
                         help='Path to the full input positions of after')
-    parser.add_argument('input_before_img',
-                        help='Path to the full image of before')
-    parser.add_argument('input_after_img',
-                        help='Path to the full image of after')
+    #parser.add_argument('input_before_img',
+    #                    help='Path to the full image of before')
+    #parser.add_argument('input_after_img',
+    #                    help='Path to the full image of after')
     parser.add_argument('-o','--output_path', default=None,
                         help='Optional path to write output files to. Defaults to current directory')
 
@@ -26,8 +26,8 @@ if __name__ == "__main__":
     input_path = args.input_path
     input_before_path = args.input_before
     input_after_path = args.input_after
-    image_before_path = args.input_before_img
-    image_after_path = args.input_after_img
+    #image_before_path = args.input_before_img
+    #image_after_path = args.input_after_img
 
     output_path = args.output_path
     
@@ -68,9 +68,9 @@ if __name__ == "__main__":
     plt.scatter([ref_before[0]*x_scale], [ref_before[1]*y_scale], c="g")
 
 
-    import matplotlib.image as mpimg
-    img = mpimg.imread(image_before_path)
-    imgplot = plt.imshow(img, alpha=0.5, cmap="Blues")
+    # import matplotlib.image as mpimg
+    # img = mpimg.imread(image_before_path)
+    #imgplot = plt.imshow(img, alpha=0.5, cmap="Blues")
 
     #img = mpimg.imread(image_after_path)
     #imgplot = plt.imshow(img, alpha=0.5, cmap="Reds")
@@ -83,4 +83,5 @@ if __name__ == "__main__":
 
     plt.legend()
 
+    plt.savefig(output_path+"map.pdf")
     plt.show()
