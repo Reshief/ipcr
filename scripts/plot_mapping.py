@@ -30,56 +30,68 @@ if __name__ == "__main__":
     #image_after_path = args.input_after_img
 
     output_path = args.output_path
-    
-
 
     full_before = np.loadtxt(input_before_path)
     full_after = np.loadtxt(input_after_path)
-    full_after[:,0] *=0.9
+    #TODO: Deal with result of mapping/scaling not being output by main program
+    full_after[:, 0] *= 0.9
 
     cell_data = np.loadtxt(input_path, ndmin=2, dtype=np.int32)
 
-    cell_data_before = cell_data[:,0]
-    cell_data_after = cell_data[:,1]
+    cell_data_before = cell_data[:, 0]
+    cell_data_after = cell_data[:, 1]
 
-    mean_x_before = np.average(full_before[cell_data_before[0],0])
-    mean_y_before = np.average(full_before[cell_data_before[0],1])
+    mean_x_before = np.average(full_before[cell_data_before[0], 0])
+    mean_y_before = np.average(full_before[cell_data_before[0], 1])
     print("Mapped:", cell_data_before[0], cell_data_after[0])
 
-    mean_x_after = np.average(full_after[cell_data_after[0],0])
-    mean_y_after = np.average(full_after[cell_data_after[0],1])
+    mean_x_after = np.average(full_after[cell_data_after[0], 0])
+    mean_y_after = np.average(full_after[cell_data_after[0], 1])
 
-    ref_before = full_before[92]#cell_data_before[0]]
-    ref_after = full_after[92]#cell_data_after[0]]
+    ref_before = full_before[cell_data_before[0]]  # cell_data_before[0]]
+    ref_after = full_after[cell_data_after[0]]  # cell_data_after[0]]
 
-    cell_index_before = cell_data_before#[:,0]
-    cell_index_after = cell_data_after#[:,0]
+    cell_index_before = cell_data_before  # [:,0]
+    cell_index_after = cell_data_after  # [:,0]
 
-    full_after[:,0] += ref_before[0] - ref_after[0]
-    full_after[:,1] += ref_before[1] - ref_after[1] 
+    full_after[:, 0] += ref_before[0] - ref_after[0]
+    full_after[:, 1] += ref_before[1] - ref_after[1]
 
-    x_scale = 413./270.24
-    y_scale = 369./241.45
+    # Conversion from pixels to microns
+    x_scale = 413.0 / 270.24
+    y_scale = 369.0 / 241.45
 
     plt.clf()
-    plt.scatter(full_before[:,0]*x_scale,full_before[:,1]*y_scale, c="tab:blue", label="before")
-    plt.scatter(full_after[:,0]*x_scale,full_after[:,1]*y_scale, c="tab:red", label="after")
+    plt.scatter(
+        full_before[:, 0] * x_scale,
+        full_before[:, 1] * y_scale,
+        c="tab:blue",
+        label="before",
+    )
+    plt.scatter(
+        full_after[:, 0] * x_scale,
+        full_after[:, 1] * y_scale,
+        c="tab:red",
+        label="after",
+    )
 
-    plt.scatter([ref_before[0]*x_scale], [ref_before[1]*y_scale], c="g")
-
+    plt.scatter([ref_before[0] * x_scale], [ref_before[1] * y_scale], c="g")
 
     # import matplotlib.image as mpimg
     # img = mpimg.imread(image_before_path)
     #imgplot = plt.imshow(img, alpha=0.5, cmap="Blues")
-
-    #img = mpimg.imread(image_after_path)
-    #imgplot = plt.imshow(img, alpha=0.5, cmap="Reds")
+    # img = mpimg.imread(image_after_path)
+    # imgplot = plt.imshow(img, alpha=0.5, cmap="Reds")
 
     for i in range(len(cell_data)):
         before_ind = int(cell_index_before[i])
         after_ind = int(cell_index_after[i])
-        
-        plt.plot([full_before[before_ind,0]*x_scale,full_after[after_ind,0]*x_scale],[full_before[before_ind,1]*y_scale,full_after[after_ind,1]*y_scale], c="k")
+
+        plt.plot(
+            [full_before[before_ind, 0] * x_scale, full_after[after_ind, 0] * x_scale],
+            [full_before[before_ind, 1] * y_scale, full_after[after_ind, 1] * y_scale],
+            c="k",
+        )
 
     plt.legend()
 

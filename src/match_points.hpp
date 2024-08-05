@@ -22,7 +22,9 @@ struct mapping_data {};
 float find_mapping_distance(const pcl::PointCloud<pcl::PointXY>::Ptr &cloud) {
   std::vector<pcl::PointXY> points;
 
+  // Don't allow single points. At least 2 cells must be available.
   if (cloud->size() < 2) {
+    std::cerr << "At least two cells must be included in the data" << std::endl;
     return -1.f;
   }
 
@@ -35,6 +37,7 @@ float find_mapping_distance(const pcl::PointCloud<pcl::PointXY>::Ptr &cloud) {
   size_t total_num_dist = 0;
   std::vector<float> min_dist_sq(num_points, std::numeric_limits<float>::max());
 
+  // Calculate the minimum neighbor distance of all cells
   for (size_t i_p = 0; i_p < num_points; i_p++) {
     for (size_t j_p = i_p + 1; j_p < num_points; j_p++) {
       float dist_sq = pcl::squaredEuclideanDistance(points[i_p], points[j_p]);
@@ -43,13 +46,18 @@ float find_mapping_distance(const pcl::PointCloud<pcl::PointXY>::Ptr &cloud) {
     }
   }
 
+  // Sort distances to closest neighbor of each cell
   std::sort(min_dist_sq.begin(), min_dist_sq.end());
 
+  // Some debug output
   std::cerr << "Min neighbor sq dist:\t" << min_dist_sq[0] << std::endl;
   std::cerr << "Max neighbor sq dist:\t" << min_dist_sq[num_points - 1]
             << std::endl;
 
-  return std::sqrt(min_dist_sq[num_points / 2]);
+  /* Use about half of the median distance as cutoff for the mapping
+   * consideration
+   */
+  return std::sqrt(min_dist_sq[num_points / 2]) * 0.7;
 }
 
 #endif
