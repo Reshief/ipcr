@@ -115,6 +115,7 @@ find_mapping(const pcl::PointCloud<pcl::PointXY>::Ptr &clouda,
     }
   }
 
+  std::cerr << "TOTALERR=" << total_err << std::endl;
   return {total_err, mapping};
 }
 

@@ -83,6 +83,8 @@ struct TransformSettings {
   } target_after;
 };
 
+TransformSettings best_transform;
+
 // Configuration options loaded at start
 struct Configuration {
   float g_f_stretch_x_min = -std::numeric_limits<float>::max();
@@ -365,7 +367,6 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr,
   }
   cv::imshow("Merge", imgMerged);
 
-
   std::cerr << "Matching with max dist:" << max_match_dist << std::endl;
   auto map_res = find_mapping(sourcePtr, target_New, max_match_dist);
   float map_err = map_res.first;
@@ -377,8 +378,8 @@ float costFunction(const PClPtr &sourcePtr, const PClPtr &targetPtr,
          (float(correspondences.size()) / float(targetPtr->size()));
   // err/=correspondences.size()+1; //not work for large cluster
   std::cout << "Cost: Matches=" << correspondences.size()
-            << "[b:" << sourcePtr->size() << "|a:" << targetPtr->size() << "]"
-            << "	Error:" << err << "\n";
+            << "\t[b:" << sourcePtr->size() << "|a:" << targetPtr->size() << "]"
+            << "\tError:" << err << "\n";
   return err;
 }
 
@@ -505,6 +506,22 @@ void doCMAES(const PClPtr &source, const PClPtr &target,
   settings.g_f_stretch_y = xbestever[1] * 0.01 + 1.0;
   settings.g_f_shear_x = xbestever[2] * 0.01;
   settings.g_f_shear_y = xbestever[3] * 0.01;
+
+  best_transform.stretch.x = settings.g_f_stretch_x;
+  best_transform.stretch.y = settings.g_f_stretch_y;
+  best_transform.shear.x = settings.g_f_shear_x;
+  best_transform.shear.y = settings.g_f_shear_y;
+
+  if (trafo_settings.has_matching) {
+    best_transform.target_before.x =
+        source->at(trafo_settings.match_index_before).x;
+    best_transform.target_before.y =
+        source->at(trafo_settings.match_index_before).y;
+    best_transform.target_after.x =
+        target->at(trafo_settings.match_index_after).x;
+    best_transform.target_after.y =
+        target->at(trafo_settings.match_index_after).y;
+  }
 
   std::cout << "translate: [" << settings.g_f_translate_x << "|"
             << settings.g_f_translate_y << "]" << std::endl;
@@ -973,11 +990,10 @@ int main(int argc, char **argv) {
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    auto map_res = find_mapping(sourcePtr, targetPtr, max_match_dist);
-    float map_err = map_res.first;
-    std::vector<std::pair<size_t, size_t>> correspondences = map_res.second;
-
-    float err = map_err / (correspondences.size() + 1);
+    // auto map_res = find_mapping(sourcePtr, targetPtr, max_match_dist);
+    // float map_err = map_res.first;
+    // std::vector<std::pair<size_t, size_t>> correspondences = map_res.second;
+    // float err = map_err / (correspondences.size() + 1);
 
     // TODO: Disabled for now
     // std::cout << correspondences.size() << "	" << err << "\n";
@@ -1019,14 +1035,22 @@ int main(int argc, char **argv) {
 
       print_version_info(oo, "#\t");
       PClPtr target_New = std::make_shared<PCl2D>();
+
+      transformPointCloud(*targetPtr, target_tmp, best_transform);
       *target_New = target_tmp;
 
-      map_res = find_mapping(sourcePtr, target_New, max_match_dist);
-      correspondences = map_res.second;
+      auto map_res = find_mapping(sourcePtr, target_New, max_match_dist);
+      float map_err = map_res.first;
+      std::vector<std::pair<size_t, size_t>> correspondences = map_res.second;
+
+      std::cout << "Total Matches=" << correspondences.size()
+                << "\t[b:" << sourcePtr->size() << "|a:" << target_New->size()
+                << "]"
+                << "\tError:" << map_err << "\n";
 
       for (int i = 0; i < correspondences.size(); ++i) {
-        oo << correspondences[i].first << "	"
-           << correspondences[i].second << "\n";
+        oo << correspondences[i].first << "	" << correspondences[i].second
+           << "\n";
       }
 
       oo.flush();
@@ -1050,8 +1074,7 @@ int main(int argc, char **argv) {
         pcl::PointXY pntSource;
         pntSource = sourcePtr->points.at(correspondences[i].first);
         pcl::PointXY pntTargetNew;
-        pntTargetNew =
-            target_tmp.points.at(correspondences[i].second);
+        pntTargetNew = target_tmp.points.at(correspondences[i].second);
         // ooAll<<correspondences.at(i).index_query<<" "<< pntSource.x/0.2<<
         // " " << pntSource.y/0.2 << " "  <<
         // correspondences.at(i).index_match << " " << pntTargetNew.x/0.2 <<
